@@ -6,6 +6,10 @@ __pycache__/
 .Python
 *.so
 
+# Git metadata (including nested submodule .git files)
+.git/
+**/.git/
+
 # Testing
 .pytest_cache/
 *.coverage
