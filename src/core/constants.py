@@ -49,15 +49,6 @@ class HTTPStatus(int, Enum):
     CONFLICT = 409
 
 
-class ContainerNames:
-    """Docker container names."""
-    DATABRIDGE: Final[str] = "databridge"
-    OPERATION_DELEGATION: Final[str] = "registration-service"
-    AAS_ENV: Final[str] = "aas-env"
-    AAS_REGISTRY: Final[str] = "aas-registry"
-    SUBMODEL_REGISTRY: Final[str] = "submodel-registry"
-
-
 class BaSyxEndpoints:
     """BaSyx endpoint paths."""
     SHELLS: Final[str] = "/shells"
