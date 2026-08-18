@@ -1,0 +1,6 @@
+[submodule "third_party/aas_pydantic"]
+	path = third_party/aas_pydantic
+	url = https://github.com/tristan-schwoerer/aas_pydantic.git
+[submodule "MQTTSchemas"]
+	path = MQTTSchemas
+	url = https://github.com/tristan-schwoerer/mqtt_message_schemas.git
