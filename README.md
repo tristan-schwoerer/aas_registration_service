@@ -34,8 +34,8 @@ Submodules:
 ## Setup
 
 ```bash
-git clone git@github.com:tristan-schwoerer/registration_service.git
-cd registration_service
+git clone git@github.com:tristan-schwoerer/aas_registration_service.git
+cd aas_registration_service
 git submodule update --init --recursive
 pip install -r requirements.txt
 ```
