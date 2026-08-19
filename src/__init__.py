@@ -43,7 +43,7 @@ from .registration_service import RegistrationService
 from .mqtt_config_registration import MQTTConfigRegistrationService
 
 # AAS Generation — IDTA-compliant via aas_pydantic
-from .aas_idta import (
+from .templates import (
     build_from_dict, build_from_json, build_resource_type_aas,
     generate_station_template, inject_ids,
     ResourceTypeAAS, templates as idta_templates,

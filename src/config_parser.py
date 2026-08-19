@@ -26,12 +26,12 @@ import json
 import logging
 from typing import Any, Dict
 
-from .aas_idta.resource_template.asset import ResourceTypeAAS
-from .aas_idta.resource_template.asset_interfaces_description import (
+from .templates.resource_template.asset import ResourceTypeAAS
+from .templates.resource_template.asset_interfaces_description import (
     ensure_aid_datapoint_schemas,
 )
-from .aas_idta.builder import merge_instance_config
-from .aas_idta.id_injector import inject_ids
+from .templates.builder import merge_instance_config
+from .templates.id_injector import inject_ids
 
 logger = logging.getLogger(__name__)
 

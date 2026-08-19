@@ -1,5 +1,5 @@
 """
-Shared constants for the aas_idta package.
+Shared constants for the templates package.
 
 All project-specific semantic IDs are defined here.
 IDTA-defined semantic IDs (admin-shell.io/idta/...) stay in their generated templates.

@@ -20,7 +20,7 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, ".."))
 sys.path.insert(0, os.path.join(_HERE, "..", "third_party", "aas_pydantic"))
 
-from src.aas_idta.builder import generate_station_template
+from src.templates.builder import generate_station_template
 
 
 def main():

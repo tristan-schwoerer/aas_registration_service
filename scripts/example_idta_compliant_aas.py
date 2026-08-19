@@ -44,7 +44,7 @@ from aas_pydantic.submodel_templates.capability_description import (
 # within it), so add the repo root to sys.path.
 sys.path.insert(0, os.path.join(_HERE, ".."))
 
-from src.aas_idta.submodel_templates.control_component_instance import ExtendedSkill
+from src.templates.submodel_templates.control_component_instance import ExtendedSkill
 from aas_pydantic.submodel_templates.control_component_instance import (
     ControlComponentInstance,
     Endpoint,

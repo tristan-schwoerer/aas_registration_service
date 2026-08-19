@@ -94,7 +94,7 @@ AID_ACTION_OUTPUT = "https://www.w3.org/2019/wot/td#hasOutput"
 class MqttActionInput(_BaseDataSchema):
     """WoT ``input`` DataSchema of an action (td#hasInput) — the command's
     JSON Schema structure (type / properties / items / enum / ranges), built
-    via :func:`aas_idta.json_schema_aid.datapoint_from_schema`."""
+    via :func:`templates.json_schema_aid.datapoint_from_schema`."""
     semantic_id: str = AID_ACTION_INPUT
     description: str = "Data schema describing the input of the action."
 

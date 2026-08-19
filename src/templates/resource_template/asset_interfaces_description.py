@@ -105,7 +105,7 @@ def mqtt_property(
     """Build a standard MQTT property with default form settings.
 
     ``schema`` (an already-dereferenced JSON Schema dict, e.g. from
-    :func:`~aas_idta.json_schema_aid.load_schema`) embeds the payload's
+    :func:`~templates.json_schema_aid.load_schema`) embeds the payload's
     object-schema structure (``type``/``properties``/``items``/``enum``/…)
     into the property via ``populate_datapoint``, leaving the forms untouched.
     The schema URL rides as a supplemental semantic id on the property itself.

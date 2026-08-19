@@ -22,7 +22,7 @@ from typing import Dict, List, Any, Optional
 
 from .config import BaSyxConfig
 from .config_parser import parse_config_file, parse_config_data
-from .aas_idta.builder import build_from_dict
+from .templates.builder import build_from_dict
 from .core import (
     HTTPClient,
     DEFAULT_GITHUB_PAGES_URL,
