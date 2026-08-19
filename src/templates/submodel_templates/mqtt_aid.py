@@ -37,12 +37,14 @@ from aas_pydantic.submodel_templates.asset_interfaces_description import (
     # title + endpoint metadata.
     Title, Base, ContentType, EndpointMetadata, Href,
     security as _Security, security_t, securityDefinitions,
+    EndpointMetadata_t,
 )
 
 from ..constants import (
     AID_MQTT_RESPONSE_FORM, AID_MQTT_RETAIN, AID_MQTT_CONTROL_PACKET,
-    AID_MQTT_QOS, AID_SYNCHRONOUS,
+    AID_MQTT_QOS, AID_SYNCHRONOUS, AID_ACTION_INPUT, AID_ACTION_OUTPUT,
 )
+from .rest_aid import RestInterface
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -83,12 +85,6 @@ class MqttForm(_BaseForm):
 # on properties).  The JSON Schema URL rides as a supplemental semantic id on
 # the DataSchema it represents — NOT as a separate URL Property child.
 # ═══════════════════════════════════════════════════════════════════════════════
-
-# WoT Thing Description 2.0 ``ActionAffordance.input`` / ``.output`` vocabulary
-# (w3.org — kept inline per the constants policy).  Both are DataSchemas, the
-# same JSON-schema-derived structure the properties embed.
-AID_ACTION_INPUT = "https://www.w3.org/2019/wot/td#hasInput"
-AID_ACTION_OUTPUT = "https://www.w3.org/2019/wot/td#hasOutput"
 
 
 class MqttActionInput(_BaseDataSchema):
@@ -145,13 +141,13 @@ class MqttInteractionMetadata(_BaseInteractionMetadata):
 class MqttInterface(_BaseMqttInterface):
     """MQTT interface with extended interaction metadata."""
     title: Title = Title()
-    endpoint_metadata: EndpointMetadata = EndpointMetadata(
+    EndpointMetadata: EndpointMetadata_t = EndpointMetadata(
         base=Base(),
-        content_type=ContentType(),
+        contentType=ContentType(),
         security=security_t(),
-        security_definitions=securityDefinitions(),
+        securityDefinitions=securityDefinitions(),
     )
-    interaction_metadata: MqttInteractionMetadata = MqttInteractionMetadata()
+    InteractionMetadata: MqttInteractionMetadata = MqttInteractionMetadata()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -159,5 +155,11 @@ class MqttInterface(_BaseMqttInterface):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class MqttAssetInterfacesDescription(_BaseAID):
-    """MQTT-extended Asset Interfaces Description."""
+    """MQTT-extended Asset Interfaces Description.
+
+    ``interface_mqtt`` describes the native MQTT endpoints; ``interface_rest``
+    (optional) describes the generated operation-delegation REST endpoints
+    that mirror each skill's native action (see ``submodel_templates.rest_aid``).
+    """
     interface_mqtt: MqttInterface = MqttInterface()
+    interface_rest: Optional[RestInterface] = None

@@ -21,11 +21,15 @@ from ..submodel_templates.mqtt_aid import (
     MqttAssetInterfacesDescription, MqttAction, MqttActionInput, MqttActionOutput,
     MqttProperty, MqttResponseForm,
 )
+from ..submodel_templates.rest_aid import (
+    RestInterface, RestAction, RestActionInput, RestActionOutput,
+    RestProperty,
+)
 from aas_pydantic.submodel_templates.asset_interfaces_description import (
     Key as AIDKey,
     Title as AIDTitle,
 )
-from ._helpers import put
+from ._helpers import put, DEFAULT_SKILLS
 
 # The StationState payload is described by ``stationState.schema.json`` — embed
 # its object-schema structure (State enum, ProcessQueue array, TimeStamp) into
@@ -123,6 +127,109 @@ def mqtt_property(
     return prop
 
 
+def rest_action(
+    name: str,
+    *,
+    synchronous: bool = True,
+    has_response: bool = True,
+    input_schema: Optional[Dict[str, Any]] = _COMMAND_SCHEMA,
+    output_schema: Optional[Dict[str, Any]] = _COMMAND_RESPONSE_SCHEMA,
+    input_schema_url: str = COMMAND_SCHEMA_URL,
+    output_schema_url: str = COMMAND_RESPONSE_SCHEMA_URL,
+) -> RestAction:
+    """Build a standard REST operation-delegation action.
+
+    Describes the generated endpoint BaSyx forwards an AAS Operation
+    invocation to — POST ``/operations/{aas_id_short}/{name}`` relative to the
+    interface's base (the resource's DMP / operation-delegation service),
+    matching the BaSyx operation-delegation example
+    (``http://…/operations/<operation>``).  Uses the same command /
+    commandResponse DataSchemas as the native MQTT action, so the AIMC
+    transformation between the two is a field passthrough.
+    """
+    action = RestAction()
+    action.key = AIDKey(value=name)
+    action.title = AIDTitle(value=name)
+    action.synchronous.value = str(synchronous).lower()
+    if input_schema is not None:
+        action.input = datapoint_from_schema(
+            input_schema, cls=RestActionInput, schema_url=input_schema_url
+        )
+    if has_response and output_schema is not None:
+        action.output = datapoint_from_schema(
+            output_schema, cls=RestActionOutput, schema_url=output_schema_url
+        )
+    forms = action.forms
+    forms.href.value = f"/operations/{{aas_id_short}}/{name}"
+    forms.op.value = "invokeAction"
+    forms.content_type.value = "application/json"
+    forms.htv_method_name.value = "POST"
+    return action
+
+
+def rest_property(
+    name: str, *,
+    value_type: str = "xs:string",
+    schema: Optional[Dict[str, Any]] = None,
+    schema_url: str = "",
+) -> RestProperty:
+    """Build a standard REST write-delegation property.
+
+    Describes the generated endpoint a write to the AAS property is forwarded
+    to — PUT ``/properties/{aas_id_short}/{name}`` relative to the interface's
+    base (the resource's DMP).  ``op`` carries the WoT ``writeProperty``
+    operation type.  An optional payload ``schema`` (JSON Schema dict) is
+    embedded like the MQTT/REST action DataSchemas.
+    """
+    prop = RestProperty()
+    prop.key = AIDKey(value=name)
+    prop.title = AIDTitle(value=name)
+    if schema is not None:
+        populate_datapoint(prop, schema, schema_url=schema_url)
+    elif value_type:
+        prop.type = Property(value=value_type)
+    forms = prop.forms
+    forms.href.value = f"/properties/{{aas_id_short}}/{name}"
+    forms.op.value = "writeProperty"
+    forms.content_type.value = "application/json"
+    forms.htv_method_name.value = "PUT"
+    return prop
+
+
+def rest_interface(actions, properties=()) -> RestInterface:
+    """Build the REST operation-delegation interface for the given actions
+    and write-able properties.
+
+    ``actions`` is a sequence of ``(name, synchronous, has_response)`` tuples;
+    ``properties`` is a sequence of ``(name, value_type)`` tuples (or
+    ``(name, value_type, schema, schema_url)``).  The base is the resource's
+    DMP / operation-delegation service URL; each href is relative to it.
+    """
+    iface = RestInterface()
+    iface.title.value = "Operation Delegation"
+    # ``{delegation_base}`` macro — resolved by id_injector to the resource's
+    # DMP/operation-delegation base URL (default: constants.DELEGATION_BASE).
+    iface.EndpointMetadata.base.value = "{delegation_base}"
+    iface.EndpointMetadata.contentType.value = "application/json"
+    im = iface.InteractionMetadata
+    for name, synchronous, has_response in actions:
+        put(
+            im.actions.property_name, name,
+            rest_action(name, synchronous=synchronous, has_response=has_response),
+        )
+    for entry in properties:
+        if len(entry) >= 4:
+            name, value_type, schema, schema_url = entry
+        else:
+            name, value_type = entry
+            schema, schema_url = None, ""
+        put(
+            im.properties.property_name, name,
+            rest_property(name, value_type=value_type, schema=schema, schema_url=schema_url),
+        )
+    return iface
+
+
 def _datapoint_schema_url(dp) -> str:
     """The JSON Schema URL carried as a supplemental semantic id of *dp*, or
     ``""`` when none is present."""
@@ -142,36 +249,39 @@ def ensure_aid_datapoint_schemas(aid) -> None:
     config-only action like Stoppering gets the same embedded DataSchemas
     without hand-writing the schema structure in the config.
     """
-    iface = getattr(aid, "interface_mqtt", None)
-    imd = getattr(iface, "interaction_metadata", None) if iface else None
-    if imd is None:
-        return
-    actions = getattr(getattr(imd, "actions", None), "property_name", None) or {}
-    for action in actions.values():
-        for fname in ("input", "output"):
-            dp = getattr(action, fname, None)
-            if dp is None or getattr(dp, "type", None) is not None:
-                continue
-            url = _datapoint_schema_url(dp)
-            if url:
-                populate_datapoint(dp, load_schema(url), schema_url=url)
-    props = getattr(getattr(imd, "properties", None), "property_name", None) or {}
-    for prop in props.values():
-        if getattr(prop, "type", None) is not None:
+    for iface in (getattr(aid, "interface_mqtt", None),
+                  getattr(aid, "interface_rest", None)):
+        if iface is None:
             continue
-        url = _datapoint_schema_url(prop)
-        if url:
-            populate_datapoint(prop, load_schema(url), schema_url=url)
+        imd = getattr(iface, "InteractionMetadata", None)
+        if imd is None:
+            continue
+        actions = getattr(getattr(imd, "actions", None), "property_name", None) or {}
+        for action in actions.values():
+            for fname in ("input", "output"):
+                dp = getattr(action, fname, None)
+                if dp is None or getattr(dp, "type", None) is not None:
+                    continue
+                url = _datapoint_schema_url(dp)
+                if url:
+                    populate_datapoint(dp, load_schema(url), schema_url=url)
+        props = getattr(getattr(imd, "properties", None), "property_name", None) or {}
+        for prop in props.values():
+            if getattr(prop, "type", None) is not None:
+                continue
+            url = _datapoint_schema_url(prop)
+            if url:
+                populate_datapoint(prop, load_schema(url), schema_url=url)
 
 
 def asset_interfaces_description() -> MqttAssetInterfacesDescription:
     """AssetInterfacesDescription with mandatory Resource actions/properties."""
     aid = MqttAssetInterfacesDescription(id_short="AssetInterfacesDescription")
     iface = aid.interface_mqtt
-    ep = iface.endpoint_metadata
+    ep = iface.EndpointMetadata
     ep.base.value = f"{BROKER}/{SITE}/{{station_name}}"
-    ep.content_type.value = "application/json"
-    im = iface.interaction_metadata
+    ep.contentType.value = "application/json"
+    im = iface.InteractionMetadata
     put(
         im.actions.property_name, "Halt",
         mqtt_action("Halt", synchronous=True, has_response=False),
@@ -188,4 +298,6 @@ def asset_interfaces_description() -> MqttAssetInterfacesDescription:
         im.properties.property_name, "StationState",
         mqtt_property("StationState", "/DATA/State", schema=_STATION_STATE_SCHEMA),
     )
+    # REST operation-delegation interface mirroring the default skills.
+    aid.interface_rest = rest_interface(DEFAULT_SKILLS)
     return aid

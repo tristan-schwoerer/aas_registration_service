@@ -17,11 +17,12 @@ import logging
 import re
 from typing import Dict, Any
 
-from aas_pydantic import ExternalReference, Key, convert_model_to_aas
+from aas_pydantic import convert_model_to_aas
 
 from .resource_template.asset import ResourceTypeAAS
+from .resource_template.property_delegation import ensure_property_write_delegation
 from .id_injector import inject_ids
-from .constants import BASE_URL, SITE
+from .constants import BASE_URL, SITE, DELEGATION_BASE
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,13 @@ def merge_instance_config(data: Dict[str, Any]) -> Dict[str, Any]:
     submodel types (Position, Coordinate, Variable, ...) and every default
     value, so a minimal config round-trips into the concrete types and any
     omitted field falls back to its default.
+
+    ``delegation_base`` is build-time metadata (the resource's DMP /
+    operation-delegation base URL) — consumed by the callers and not a model
+    field, so it is popped here before validation.
     """
+    data = dict(data)
+    data.pop("delegation_base", None)
     base = ResourceTypeAAS(
         id_short=data["id_short"],
         id=data.get("id") or f"{BASE_URL}/aas/{data['id_short']}",
@@ -92,9 +99,14 @@ def build_from_dict(data: Dict[str, Any]) -> Any:
     Constructs type defaults from ResourceTypeAAS, then deep-merges the
     instance config on top.  This preserves specialised subtypes and
     default entries the instance config does not mention.
+
+    The optional ``delegation_base`` config key overrides the resource's
+    operation-delegation (DMP) base URL.
     """
+    delegation_base = data.get("delegation_base") or DELEGATION_BASE
     asset = ResourceTypeAAS.model_validate(merge_instance_config(data))
-    inject_ids(asset)
+    ensure_property_write_delegation(asset)
+    inject_ids(asset, delegation_base=delegation_base)
     return convert_model_to_aas(asset)
 
 
@@ -113,6 +125,7 @@ def generate_station_template(
     aas_id_short: str,
     aas_id: str = "",
     asset_type: str,
+    delegation_base: str = DELEGATION_BASE,
 ) -> dict:
     """Dump the full ResourceTypeAAS model with identity fields filled in.
 
@@ -120,6 +133,9 @@ def generate_station_template(
     complete shape of a Resource AAS.  The user trims unwanted sections,
     adds instance-specific skills/parameters, and saves as a station config.
     Omitted fields fall back to class defaults at registration time.
+
+    ``delegation_base`` is emitted as a top-level config key so each resource
+    can point its skill Operation delegation at its own DMP.
     """
     if not aas_id:
         aas_id = f"{BASE_URL}/aas/{aas_id_short}"
@@ -130,7 +146,9 @@ def generate_station_template(
         asset_type=asset_type,
         derived_from=f"{BASE_URL}/aas/templates/resource",
     )
-    return asset.model_dump()
+    template = asset.model_dump()
+    template["delegation_base"] = delegation_base
+    return template
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -150,11 +168,13 @@ def build_resource_type_aas(
     site_path: str = SITE,
     broker_host: str = "192.168.0.104",
     broker_port: int = 1883,
+    delegation_base: str = DELEGATION_BASE,
 ) -> ResourceTypeAAS:
     """Build a fully-populated ResourceTypeAAS with station overrides.
 
     Constructs from class defaults, then applies station-specific values.
     Returns the validated Pydantic model instance (not a dict).
+    ``delegation_base`` is the resource's DMP / operation-delegation base URL.
     """
     if not station_name:
         station_name = aas_id_short or "station"
@@ -178,7 +198,7 @@ def build_resource_type_aas(
         sids = {}
         if serial_number:
             sids["serialNumber"] = serial_number
-            asset.nameplate.serial_number.value = serial_number
+            asset.nameplate.SerialNumber.value = serial_number
         if location:
             sids["location"] = location
         asset.specific_asset_ids = sids
@@ -186,22 +206,14 @@ def build_resource_type_aas(
     aid = asset.asset_interfaces_description
     if aid and hasattr(aid, "interface_mqtt"):
         iface = aid.interface_mqtt
-        if hasattr(iface, "endpoint_metadata"):
-            iface.endpoint_metadata.base.value = broker_uri
+        if hasattr(iface, "EndpointMetadata"):
+            iface.EndpointMetadata.base.value = broker_uri
         if hasattr(iface, "title"):
             iface.title.value = station_name
-    cci = asset.control_component_instance
-    if (
-        cci
-        and hasattr(cci, "endpoints")
-        and isinstance(cci.endpoints.endpoint, dict)
-        and "endpoint" in cci.endpoints.endpoint
-    ):
-        # endpoint_reference is a ReferenceElement → the broker URI must be
-        # wrapped in an ExternalReference (a bare str would corrupt .value).
-        cci.endpoints.endpoint["endpoint"].endpoint_reference.value = (
-            ExternalReference(key=(Key(type_="GlobalReference", value=broker_uri),))
-        )
+    # The CCI ``endpoints`` container holds per-skill native-interface
+    # relationships (see resource_template/control_component_instance.py) —
+    # no broker endpoint to patch here.
 
-    inject_ids(asset)
+    ensure_property_write_delegation(asset)
+    inject_ids(asset, delegation_base=delegation_base)
     return asset

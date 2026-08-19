@@ -12,8 +12,8 @@ JSON Schema   AID element (semanticId)
 ``enum``      ``value.enum`` SML (json-schema#enum)
 ``default``   ``value.default`` (json-schema#default)
 ``minimum``/``maximum``        ``value.min_max`` Range (minMaxRange)
-``minLength``/``maxLength``    ``value.length_range`` Range (lengthRange)
-``minItems``/``maxItems``      ``value.items_range`` Range (itemsRange)
+``minLength``/``maxLength``    ``value.lengthRange`` Range (lengthRange)
+``minItems``/``maxItems``      ``value.itemsRange`` Range (itemsRange)
 ``items``     ``value.items`` SMC (json-schema#items)
 ``properties``                 ``value.properties`` → ``property_name`` map
 ============  ==========================================================
@@ -215,7 +215,7 @@ def _fill_items(items: Any, schema: Dict[str, Any]) -> None:
         _fill_enum(_child(items, "enum", _Enum), schema["enum"])
     _set_range_if_bounds(items, "min_max",
                          schema.get("minimum"), schema.get("maximum"))
-    _set_range_if_bounds(items, "length_range",
+    _set_range_if_bounds(items, "lengthRange",
                          schema.get("minLength"), schema.get("maxLength"))
 
 
@@ -251,9 +251,19 @@ def _fill_form(
         ("content_type", content_type),
         ("subprotocol", subprotocol),
     ):
-        if value is None or fname not in type(forms).model_fields:
+        if value is None:
             continue
-        _child(forms, fname, Property).value = value
+        # The regenerated IDTA ``forms``/``MqttForm`` use the published
+        # camelCase ``contentType`` id_short; the handwritten form classes
+        # (``MqttResponseForm``, ``RestForm``) keep ``content_type``.
+        field_name = (
+            "contentType"
+            if fname == "content_type" and "contentType" in type(forms).model_fields
+            else fname
+        )
+        if field_name not in type(forms).model_fields:
+            continue
+        _child(forms, field_name, Property).value = value
 
 
 def populate_datapoint(
@@ -325,11 +335,11 @@ def populate_datapoint(
     # numeric / string / array bounds — Ranges appear only when bounded
     _set_range_if_bounds(dp, "min_max",
                          schema.get("minimum"), schema.get("maximum"))
-    _set_range_if_bounds(dp, "length_range",
+    _set_range_if_bounds(dp, "lengthRange",
                          schema.get("minLength"), schema.get("maxLength"))
 
     if datatype == "array":
-        _set_range_if_bounds(dp, "items_range",
+        _set_range_if_bounds(dp, "itemsRange",
                              schema.get("minItems"), schema.get("maxItems"))
         item = schema.get("items")
         if isinstance(item, dict):

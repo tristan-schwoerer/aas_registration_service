@@ -28,3 +28,14 @@ def put(container: Any, key: str, element: SubmodelElement) -> SubmodelElement:
     else:
         container[key] = element
     return element
+
+
+# The mandatory default Resource skills, mirrored across the CCI (skills +
+# endpoints relationships), the AID (native MQTT actions + REST
+# operation-delegation actions) and the AIMC (skill mapping configurations).
+# Each entry is ``(name, synchronous, has_response)``.
+DEFAULT_SKILLS = (
+    ("Halt", True, False),
+    ("Occupy", True, True),
+    ("Release", True, True),
+)

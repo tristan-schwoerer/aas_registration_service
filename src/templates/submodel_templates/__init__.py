@@ -28,7 +28,12 @@ from .control_component_instance import (
     Term,
     ExtendedSkill,
     ExtendedSkills,
+    SkillOperation,
+    OperationVariableProp,
+    SkillInterfaceRelationship,
+    ResourceEndpoints,
 )
+from .rest_aid import RestInterface, RestAction, RestProperty, RestForm, RestProperties
 from .variables import Variables
 from .parameters import Parameters
 from .aimc import Aimc
@@ -48,6 +53,16 @@ __all__ = [
     # Skills
     "ExtendedSkill",
     "ExtendedSkills",
+    "SkillOperation",
+    "OperationVariableProp",
+    "SkillInterfaceRelationship",
+    "ResourceEndpoints",
+    # REST AID interface
+    "RestInterface",
+    "RestAction",
+    "RestProperty",
+    "RestForm",
+    "RestProperties",
     # Custom submodels
     "Variables",
     "Parameters",

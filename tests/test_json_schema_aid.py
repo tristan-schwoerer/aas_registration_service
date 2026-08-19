@@ -101,7 +101,7 @@ def test_resource_aid_station_state_embeds_schema():
     """The Resource AID's StationState property embeds the schema structure
     while keeping its MQTT form."""
     aid = asset_interfaces_description()
-    im = aid.interface_mqtt.interaction_metadata
+    im = aid.interface_mqtt.InteractionMetadata
     ss = im.properties.property_name["StationState"]
     assert ss.type.value == "object"
     assert set(ss.properties.property_name) == {
@@ -120,8 +120,8 @@ def test_array_prefix_items_homogeneous_type():
     pos = dp.properties.property_name["Position"]
     assert pos.type.value == "array"
     assert pos.items.type.value == "number"
-    assert pos.items_range.min == 2
-    assert pos.items_range.max == 3
+    assert pos.itemsRange.min == 2
+    assert pos.itemsRange.max == 3
 
 
 def test_move_command_allof_merges():
@@ -133,8 +133,8 @@ def test_move_command_allof_merges():
     nested = dp.properties.property_name
     assert nested["TargetPos"].type.value == "array"
     assert nested["TargetPos"].items.type.value == "number"
-    assert nested["TargetPos"].items_range.min == 2
-    assert nested["TargetPos"].items_range.max == 2
+    assert nested["TargetPos"].itemsRange.min == 2
+    assert nested["TargetPos"].itemsRange.max == 2
 
 
 def test_datapoint_from_schema_takes_form_inputs():
@@ -159,7 +159,7 @@ def test_datapoint_from_schema_takes_form_inputs():
     assert type(mqtt.forms).__name__ == "MqttForm"
     assert mqtt.forms.href.value == "/DATA/State"
     assert mqtt.forms.op.value == "observeProperty"
-    assert mqtt.forms.content_type.value == "application/json"
+    assert mqtt.forms.contentType.value == "application/json"
 
     # 3. an already-set forms (MQTT builder) is left alone when no fields pass
     prop = mqtt_property("StationState", "/DATA/State", schema=_station_state_schema())
@@ -183,7 +183,7 @@ def test_resource_aid_actions_embed_input_output_schemas():
 
     # The Resource AID carries them per action
     aid = asset_interfaces_description()
-    actions = aid.interface_mqtt.interaction_metadata.actions.property_name
+    actions = aid.interface_mqtt.InteractionMetadata.actions.property_name
 
     halt = actions["Halt"]
     assert type(halt.input).__name__ == "MqttActionInput"

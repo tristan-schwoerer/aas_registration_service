@@ -83,28 +83,28 @@ def sm_id(name: str) -> str:
 nameplate = Nameplate(
     id_short="Nameplate",
     id=sm_id("Nameplate"),
-    u_r_i_of_the_product=URIOfTheProduct(
+    URIOfTheProduct=URIOfTheProduct(
         value="https://example.com/products/SYN-SS-001"),
-    manufacturer_name=ManufacturerName(value={"en": "Syntegon Technology GmbH"}),
-    manufacturer_product_designation=ManufacturerProductDesignation(
+    ManufacturerName=ManufacturerName(value={"en": "Syntegon Technology GmbH"}),
+    ManufacturerProductDesignation=ManufacturerProductDesignation(
         value={"en": "Stoppering System 2024"}),
-    address_information=AddressInformation(
-        street=Street(value={"en": "Nybrovej 114"}),
-        zipcode=Zipcode(value={"en": "9220"}),
-        city_town=CityTown(value={"en": "Aalborg Øst"}),
-        national_code=NationalCode(value={"en": "DK"}),
+    AddressInformation=AddressInformation(
+        Street=Street(value={"en": "Nybrovej 114"}),
+        Zipcode=Zipcode(value={"en": "9220"}),
+        CityTown=CityTown(value={"en": "Aalborg Øst"}),
+        NationalCode=NationalCode(value={"en": "DK"}),
     ),
-    order_code_of_manufacturer=OrderCodeOfManufacturer(value="SYN-SS-2024-001"),
+    OrderCodeOfManufacturer=OrderCodeOfManufacturer(value="SYN-SS-2024-001"),
 )
 # Optional children — metadata already on the Property defaults
-nameplate.serial_number = SerialNumber(value="SYN-SS-2024-001")
-nameplate.year_of_construction = YearOfConstruction(value="2024")
-nameplate.manufacturer_product_type = ManufacturerProductType(
+nameplate.SerialNumber = SerialNumber(value="SYN-SS-2024-001")
+nameplate.YearOfConstruction = YearOfConstruction(value="2024")
+nameplate.ManufacturerProductType = ManufacturerProductType(
     value="Pharmaceutical Stoppering Station")
-nameplate.country_of_origin = CountryOfOrigin(value="DE")
-# arbitrary_property is a multi-cardinality map
-nameplate.asset_specific_properties = AssetSpecificProperties(
-    arbitrary_property={
+nameplate.CountryOfOrigin = CountryOfOrigin(value="DE")
+# ArbitraryProperty is a multi-cardinality map
+nameplate.AssetSpecificProperties = AssetSpecificProperties(
+    ArbitraryProperty={
         "process_cell": ArbitraryProperty(value="ProcessCell: InnoLab Line 1")
     }
 )
@@ -114,16 +114,16 @@ capability_desc = CapabilityDescription(
     id_short="CapabilityDescription",
     id=sm_id("CapabilityDescription"),
 )
-# capability_set / capability_container are multi-cardinality maps → build the
+# CapabilitySet / CapabilityContainer are multi-cardinality maps → build the
 # nested structure explicitly.
 cc = CapabilityContainer(
-    capability=Capability(semantic_id=f"{BASE_URL}/capabilities/Stoppering")
+    Capability=Capability(semantic_id=f"{BASE_URL}/capabilities/Stoppering")
 )
-cc.capability_comment = CapabilityComment(
+cc.CapabilityComment = CapabilityComment(
     value={"en": "Places rubber stoppers into vials at up to 120 ppm"}
 )
-cc.capability_relations = CapabilityRelations(
-    capability_realized_by={
+cc.CapabilityRelations = CapabilityRelations(
+    CapabilityRealizedBy={
         "capability_realized_by": CapabilityRealizedBy(
             first=ModelReference(
                 key=(Key(type_="Submodel", value=sm_id("CapabilityDescription")),)
@@ -134,23 +134,23 @@ cc.capability_relations = CapabilityRelations(
         )
     }
 )
-capability_desc.capability_set = {
+capability_desc.CapabilitySet = {
     "capability_set": CapabilitySet(
-        capability_container={"capability_container": cc}
+        CapabilityContainer={"capability_container": cc}
     )
 }
 
 def _make_skill() -> ExtendedSkill:
     """Skill with template-default metadata; only the runtime value is set."""
     skill = ExtendedSkill()
-    skill.disabled.value = "false"
+    skill.Disabled.value = "false"
     return skill
 
 # ── Control Component Instance (Pattern 2: explicit model instances) ──
 cci = ControlComponentInstance(
     id_short="ControlComponentInstance",
     id=sm_id("ControlComponentInstance"),
-    type=Type_instance(
+    Type=Type_instance(
         value=ModelReference(
             key=(Key(
                 type_="Submodel",
@@ -158,10 +158,10 @@ cci = ControlComponentInstance(
             ),)
         )
     ),
-    endpoints=Endpoints(
-        endpoint={
+    Endpoints=Endpoints(
+        Endpoint={
             "endpoint": Endpoint(
-                interface_reference=InterfaceReference(
+                InterfaceReference=InterfaceReference(
                     value=ExternalReference(
                         key=(Key(
                             type_="GlobalReference",
@@ -169,7 +169,7 @@ cci = ControlComponentInstance(
                         ),)
                     )
                 ),
-                endpoint_reference=EndpointReference(
+                EndpointReference=EndpointReference(
                     value=ExternalReference(
                         key=(Key(
                             type_="GlobalReference",
@@ -180,7 +180,7 @@ cci = ControlComponentInstance(
             )
         }
     ),
-    skills=Skills(skill={"skill": _make_skill()}),
+    Skills=Skills(Skill={"skill": _make_skill()}),
 )
 
 # ═══════════════════════════════════════════════════════════════════════

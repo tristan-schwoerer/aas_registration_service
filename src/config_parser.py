@@ -32,6 +32,10 @@ from .templates.resource_template.asset_interfaces_description import (
 )
 from .templates.builder import merge_instance_config
 from .templates.id_injector import inject_ids
+from .templates.constants import DELEGATION_BASE
+from .templates.resource_template.property_delegation import (
+    ensure_property_write_delegation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +51,22 @@ def parse_config_data(data: Dict[str, Any]) -> ResourceTypeAAS:
     instance config — so specialized types survive and omitted fields fall
     back to defaults), inject IDs, return model instance.
 
+    The optional top-level ``delegation_base`` config key overrides the
+    resource's DMP / operation-delegation base URL (defaults to
+    ``constants.DELEGATION_BASE``); it is resolved into the skill Operation
+    ``invocationDelegation`` qualifiers and the AID REST interface base.
+
     Config-declared AID datapoints (action ``input``/``output`` DataSchemas,
     property payload schemas) that carry a JSON Schema URL as their
     supplemental semantic id are populated from that schema."""
+    delegation_base = data.get("delegation_base") or DELEGATION_BASE
     asset = ResourceTypeAAS.model_validate(merge_instance_config(data))
-    inject_ids(asset)
+    # Property write-delegation: any property carrying a ``writeDelegation``
+    # qualifier gets its REST write interface + AIMC mapping auto-wired
+    # (before id injection so the ``{delegation_base}``/``{aas_id_short}``
+    # macros resolve).
+    ensure_property_write_delegation(asset)
+    inject_ids(asset, delegation_base=delegation_base)
     if asset.asset_interfaces_description is not None:
         ensure_aid_datapoint_schemas(asset.asset_interfaces_description)
     return asset

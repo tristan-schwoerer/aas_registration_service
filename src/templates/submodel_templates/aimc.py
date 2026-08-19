@@ -8,10 +8,10 @@ Lua script (``aimc_main(sources)``).
 The concepts come from the generated IDTA AIMC 2.0 template:
 ``MappingConfiguration`` carries ``default_polling_interval``, a
 ``Transformation`` (a Blob of Lua source, ``text/plain``), ``Sources[]`` and
-``Sinks[]``.  This module adds a dedicated ``Transformation(Blob)`` class (the
-template models it as a generic Blob) and narrows the mapping configuration to
-use it, while inheriting ``sources``/``sinks`` straight from the generated
-container class.
+``Sinks[]``.  This module subclasses the generated ``Transformation`` (a Blob
+of Lua source, ``text/plain``) and narrows the mapping configuration to use it,
+while inheriting ``Sources``/``Sinks`` straight from the generated container
+class.
 
 Named-field style: containers hold their children as DIRECT named fields
 (no ``value``/``submodel_element`` wrapper).
@@ -35,13 +35,16 @@ from typing import ClassVar, List
 
 from pydantic import model_validator
 from aas_pydantic import (
-    Blob, Submodel,
+    Submodel,
 )
 from aas_pydantic.submodel_templates.asset_interfaces_mapping_configuration import (
     Sources,
     Sinks,
+    Sources_t, Sinks_t,
     MappingConfiguration as _BaseMappingConfiguration,
     MappingConfigurations as _BaseMappingConfigurations,
+    Transformation as _BaseTransformation,
+    Transformation_t,
 )
 
 AIMC_SUBMODEL = "https://admin-shell.io/idta/AssetInterfacesMappingConfiguration/2/0/Submodel"
@@ -50,12 +53,13 @@ AIMC_MAPPING_CONFIGURATION = "https://admin-shell.io/idta/AssetInterfacesMapping
 AIMC_TRANSFORMATION = "https://admin-shell.io/idta/AssetInterfacesMappingConfiguration/2/0/MappingConfiguration/Transformation"
 
 
-class Transformation(Blob):
+class Transformation(_BaseTransformation):
     """The AIMC transformation — the Lua ``aimc_main(sources)`` script.
 
-    The IDTA template models it as a Blob with ``text/plain`` content type;
-    the script is stored as bytes.  A plain Lua string is accepted on input
-    and encoded, so configs can be authored as text.
+    Subclasses the generated AIMC ``Transformation`` (a Blob) so it matches
+    the ``Transformation_t`` annotation on ``AimcMappingConfiguration``; the
+    script is stored as bytes.  A plain Lua string is accepted on input and
+    encoded, so configs can be authored as text.
     """
     semantic_id: str = AIMC_TRANSFORMATION
     description: str = (
@@ -76,12 +80,12 @@ class Transformation(Blob):
 class AimcMappingConfiguration(_BaseMappingConfiguration):
     """A single mapping: AID sources → AAS sinks + a Lua transformation.
 
-    ``sources``/``sinks`` are required (One) in the template — provided here
-    so the variant constructs; ``transformation`` is narrowed to the
+    ``Sources``/``Sinks`` are required (One) in the template — provided here
+    so the variant constructs; ``Transformation`` is narrowed to the
     dedicated Blob concept."""
-    sources: Sources = Sources()
-    sinks: Sinks = Sinks()
-    transformation: Transformation = Transformation()
+    Sources: Sources_t = Sources()
+    Sinks: Sinks_t = Sinks()
+    Transformation: Transformation_t = Transformation()
 
 
 class AimcMappingConfigurations(_BaseMappingConfigurations):
@@ -100,7 +104,7 @@ class Aimc(Submodel):
     VERSION: ClassVar[str] = "2"
     REVISION: ClassVar[str] = "0"
 
-    mapping_configurations: AimcMappingConfigurations = AimcMappingConfigurations()
+    MappingConfigurations: AimcMappingConfigurations = AimcMappingConfigurations()
 
 
 AimcMappingConfiguration.model_rebuild()

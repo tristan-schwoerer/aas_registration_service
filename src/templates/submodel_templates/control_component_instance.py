@@ -18,15 +18,18 @@ from __future__ import annotations
 
 from typing import ClassVar, Dict, List, Optional
 
+from pydantic import model_validator
 from aas_pydantic import (
     SubmodelElementCollection,
-    Property, ReferenceElement,
+    Property, ReferenceElement, Operation, RelationshipElement, Qualifier,
 )
 
 from aas_pydantic.submodel_templates.control_component_instance import (
     Skill as _BaseSkill,
     Skills as _BaseSkills,
     Disabled, Modes, Parameters, Errors, Uses,
+    Disabled_t, Modes_t, Parameters_t, Errors_t, Uses_t,
+    Endpoints as _BaseEndpoints,
 )
 
 from ..constants import (
@@ -81,30 +84,111 @@ EXTENDED_SKILLS = f"{BASE_URL}/ControlComponent/Skills/2/0"
 EXTENDED_SKILL = f"{BASE_URL}/ControlComponent/Skill/2/0"
 EXTENDED_SKILL_INTERFACE_REF = f"{BASE_URL}/ControlComponent/Skill/1/0"
 
+# Skill Operation (operation delegation) + endpoint relationships
+SKILL_OPERATION = f"{BASE_URL}/ControlComponent/Skill/Operation/2/0"
+SKILL_OPERATION_VARIABLE = f"{BASE_URL}/ControlComponent/Skill/OperationVariable/1/0"
+SKILL_INVOCATION_DELEGATION = f"{BASE_URL}/ControlComponent/Skill/InvocationDelegation/1/0"
+SKILL_INTERFACE_RELATIONSHIP = f"{BASE_URL}/ControlComponent/Skill/NativeInterface/1/0"
+
+
+class OperationVariableProp(Property):
+    """A single input/inoutput/output variable of a skill's Operation.
+
+    Mirrors the command / commandResponse schemas the native MQTT action
+    carries (e.g. ``Uuid``, ``State``, ``Outcome``) so the AAS Web GUI can
+    render and manually invoke the operation.
+    """
+    semantic_id: str = SKILL_OPERATION_VARIABLE
+    description: str = "An operation variable of the skill's operation."
+
+
+class SkillOperation(Operation):
+    """The skill's AAS Operation — the executable entry point for clients.
+
+    Invoking it is delegated to the OperationDelegation/DMP service via the
+    ``invocationDelegation`` qualifier (which carries the generated REST
+    endpoint).  The input/inoutput/output variables mirror the native MQTT
+    action's command / commandResponse payloads (e.g. ``Uuid``, ``State``,
+    ``Outcome``) so the operation can also be rendered and invoked manually
+    from the AAS Web GUI.
+    """
+    semantic_id: str = SKILL_OPERATION
+    description: str = "Operation to invoke this skill (delegated via operation delegation)."
+
+    input_variable: List[OperationVariableProp] = []
+    output_variable: List[OperationVariableProp] = []
+    in_output_variable: List[OperationVariableProp] = []
+
+    @model_validator(mode="before")
+    @classmethod
+    def _strip_variable_discriminators(cls, data):
+        """Strip the ``modelType`` discriminator the base Operation serializer
+        tags onto each variable item — the declared element type is
+        authoritative and ``extra="forbid"`` would otherwise reject it on the
+        dump → validate round-trip."""
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+        for fname in ("input_variable", "output_variable", "in_output_variable"):
+            vals = out.get(fname)
+            if not isinstance(vals, list):
+                continue
+            out[fname] = [
+                {k: v for k, v in item.items() if k not in ("modelType", "model_type")}
+                if isinstance(item, dict) else item
+                for item in vals
+            ]
+        return out
+
+
+class SkillInterfaceRelationship(RelationshipElement):
+    """Annotated relationship: THIS skill has THIS native interface in the AID.
+
+    ``first`` references the skill SMC (``ControlComponentInstance/skills/<skill>``),
+    ``second`` references its native action in the AID
+    (``AssetInterfacesDescription/interface_mqtt/interaction_metadata/actions/<skill>``).
+    Replaces the generic Endpoint ``interface_reference``/``endpoint_reference``
+    ReferenceElements for the per-skill native-interface linkage.
+    """
+    semantic_id: str = SKILL_INTERFACE_RELATIONSHIP
+    description: str = "This skill has this native interface in the AID submodel."
+
+
+class ResourceEndpoints(_BaseEndpoints):
+    """Endpoints container holding one annotated native-interface relationship
+    per skill (keyed by skill name) instead of generic Endpoint SMCs."""
+    Endpoint: Dict[str, SkillInterfaceRelationship] = {}
+
 
 class ExtendedSkill(_BaseSkill):
-    """Skill children + the interface-reference extension, as DIRECT named
-    fields.  The IDTA template marks ``disabled``/``modes``/``parameters``/
-    ``errors``/``uses`` as mandatory (One) — provided here so the
-    MQTT-extended skill constructs; stations override ``modes`` etc. via
-    config."""
+    """Skill children + the interface-reference + operation extensions, as
+    DIRECT named fields.  The IDTA template marks ``Disabled``/``Modes``/
+    ``Parameters``/``Errors``/``Uses`` as mandatory (One) — provided here so
+    the MQTT-extended skill constructs; stations override ``Modes`` etc. via
+    config.
+
+    ``interface_reference`` points at the skill's NATIVE interface (the AID
+    action it maps to — read by BT_Controller for MQTT topic resolution);
+    ``operation`` is the AAS Operation exposed to clients and delegated to
+    OperationDelegation."""
     semantic_id: str = EXTENDED_SKILL
-    disabled: Disabled = Disabled()
-    modes: Modes = Modes()
-    parameters: Parameters = Parameters()
-    errors: Errors = Errors()
-    uses: Uses = Uses()
+    Disabled: Disabled_t = Disabled()
+    Modes: Modes_t = Modes()
+    Parameters: Parameters_t = Parameters()
+    Errors: Errors_t = Errors()
+    Uses: Uses_t = Uses()
     interface_reference: ReferenceElement = ReferenceElement(
         semantic_id=EXTENDED_SKILL_INTERFACE_REF,
         description="Reference to the corresponding AID action interface for MQTT topic resolution.",
     )
+    operation: Optional[SkillOperation] = None
 
 
 class ExtendedSkills(_BaseSkills):
     """Dynamic map of extended skills offered by the component instance
     (name → ExtendedSkill)."""
     semantic_id: str = EXTENDED_SKILLS
-    skill: Dict[str, ExtendedSkill] = {}
+    Skill: Dict[str, ExtendedSkill] = {}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
