@@ -42,7 +42,7 @@ def nameplate() -> Nameplate:
             value={"en": "Pharmaceutical Processing Resource"}
         ),
         AddressInformation=AddressInformation(
-            Street=Street(value={"en": "Nybrovej 114"}),
+            Street=Street(value={"en": "Fibigerstræde 14"}),
             Zipcode=Zipcode(value={"en": "9220"}),
             CityTown=CityTown(value={"en": "Aalborg Øst"}),
             NationalCode=NationalCode(value={"en": "DK"}),

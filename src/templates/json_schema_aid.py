@@ -248,22 +248,12 @@ def _fill_form(
     for fname, value in (
         ("href", href),
         ("op", op),
-        ("content_type", content_type),
+        ("contentType", content_type),
         ("subprotocol", subprotocol),
     ):
-        if value is None:
+        if value is None or fname not in type(forms).model_fields:
             continue
-        # The regenerated IDTA ``forms``/``MqttForm`` use the published
-        # camelCase ``contentType`` id_short; the handwritten form classes
-        # (``MqttResponseForm``, ``RestForm``) keep ``content_type``.
-        field_name = (
-            "contentType"
-            if fname == "content_type" and "contentType" in type(forms).model_fields
-            else fname
-        )
-        if field_name not in type(forms).model_fields:
-            continue
-        _child(forms, field_name, Property).value = value
+        _child(forms, fname, Property).value = value
 
 
 def populate_datapoint(

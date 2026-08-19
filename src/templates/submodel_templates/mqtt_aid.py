@@ -57,7 +57,7 @@ class MqttResponseForm(SubmodelElementCollection):
 
     href: Property = Property(
         semantic_id="https://www.w3.org/2019/wot/hypermedia#hasTarget")
-    content_type: Property = Property(
+    contentType: Property = Property(
         semantic_id="https://www.w3.org/2019/wot/hypermedia#forContentType")
     mqv_retain: Property = Property(
         semantic_id=AID_MQTT_RETAIN)

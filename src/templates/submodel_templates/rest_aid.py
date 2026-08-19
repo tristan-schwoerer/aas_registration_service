@@ -69,8 +69,8 @@ class RestForm(SubmodelElementCollection):
     security: security_t = security_t()
     op: Property = Property(
         semantic_id="https://www.w3.org/2019/wot/td#hasOperationType")
-    content_type: ContentType = ContentType()
-    htv_method_name: HtvMethodName = HtvMethodName(
+    contentType: ContentType = ContentType()
+    htv_methodName: HtvMethodName = HtvMethodName(
         semantic_id=AID_REST_HTTP_METHOD)
 
 

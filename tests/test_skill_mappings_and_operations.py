@@ -324,7 +324,7 @@ def test_property_write_delegation_rest_interface_and_aimc():
     loc = props["Location"]
     assert loc.forms.href.value == "/properties/syntegonStopperingSystemAAS/Location"
     assert loc.forms.op.value == "writeProperty"
-    assert loc.forms.htv_method_name.value == "PUT"
+    assert loc.forms.htv_methodName.value == "PUT"
 
     # AIMC mapping: native MQTT action source → REST property sink.
     aimc = asset.asset_interfaces_mapping_configuration

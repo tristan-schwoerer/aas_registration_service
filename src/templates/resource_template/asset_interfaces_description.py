@@ -94,7 +94,7 @@ def mqtt_action(
         # bare ``Property(value=...)`` instances would strip them.
         resp = MqttResponseForm()
         resp.href.value = f"/DATA/{name}"
-        resp.content_type.value = "application/json"
+        resp.contentType.value = "application/json"
         resp.mqv_control_packet.value = "publish"
         resp.mqv_retain.value = "false"
         forms.response = resp
@@ -162,8 +162,8 @@ def rest_action(
     forms = action.forms
     forms.href.value = f"/operations/{{aas_id_short}}/{name}"
     forms.op.value = "invokeAction"
-    forms.content_type.value = "application/json"
-    forms.htv_method_name.value = "POST"
+    forms.contentType.value = "application/json"
+    forms.htv_methodName.value = "POST"
     return action
 
 
@@ -191,8 +191,8 @@ def rest_property(
     forms = prop.forms
     forms.href.value = f"/properties/{{aas_id_short}}/{name}"
     forms.op.value = "writeProperty"
-    forms.content_type.value = "application/json"
-    forms.htv_method_name.value = "PUT"
+    forms.contentType.value = "application/json"
+    forms.htv_methodName.value = "PUT"
     return prop
 
 
