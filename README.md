@@ -6,7 +6,7 @@ The registration service has exactly **five responsibilities** — the published
 AAS is the single source of truth for all downstream services:
 
 1. Convert IDTA templates into Pydantic classes (`third_party/aas_pydantic/scripts/idta_generate.py`)
-2. Modify / extend / add Pydantic classes to define submodel and asset templates (`src/aas_idta/`)
+2. Modify / extend / add Pydantic classes to define submodel and asset templates (`src/templates/`)
 3. Generate a JSON template for asset templates (`generate_station_template`)
 4. Deep-merge the filled-out asset template with the JSON config received via MQTT (`config_parser.parse_config_data`)
 5. Post the AAS to BaSyx

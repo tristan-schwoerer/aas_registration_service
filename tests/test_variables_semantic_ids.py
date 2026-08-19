@@ -1,4 +1,4 @@
-"""Variables submodel — semantic_id propagation tests (aas_idta flow).
+"""Variables submodel — semantic_id propagation tests (templates flow).
 
 Verifies that the Variables submodel built from a ResourceTypeAAS config
 carries the ontology semantic URI (``semantic_id_param``) on each variable.
@@ -20,7 +20,7 @@ from basyx.aas import model
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "third_party", "aas_pydantic")))
 
-from src.aas_idta.builder import build_from_json  # noqa: E402
+from src.templates.builder import build_from_json  # noqa: E402
 
 CONFIG_PATH = os.environ.get(
     "AAS_TEST_CONFIG",
