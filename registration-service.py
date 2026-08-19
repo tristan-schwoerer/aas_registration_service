@@ -216,7 +216,7 @@ Examples:
             try:
                 mqtt_service.start()
                 logger.info("✓ MQTT listener started. Press Ctrl+C to stop.")
-                logger.info("\nUnified Service running with:")
+                logger.info("\nRegistration service running with:")
                 logger.info("  - MQTT registration listener (deep merge → AAS → post to BaSyx)")
                 logger.info("\nSupported config message formats:")
                 logger.info("1. Raw YAML (from ESP32 devices):")

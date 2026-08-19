@@ -38,7 +38,7 @@ from .config_parser import (
     parse_config_file, parse_config_data,
 )
 
-# Unified service
+# Registration service
 from .registration_service import RegistrationService
 from .mqtt_config_registration import MQTTConfigRegistrationService
 
@@ -61,7 +61,7 @@ __all__ = [
     'encode_aas_id', 'sanitize_id', 'topic_to_id',
     # Config parsing
     'parse_config_file', 'parse_config_data',
-    # Unified service
+    # Registration service
     'RegistrationService',
     'MQTTConfigRegistrationService',
     # AAS Generation

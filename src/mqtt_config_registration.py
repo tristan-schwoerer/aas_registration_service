@@ -83,7 +83,7 @@ class MQTTConfigRegistrationService:
             logger.warning("MQTT registration service already running")
             return
 
-        logger.info("Starting unified MQTT registration service...")
+        logger.info("Starting MQTT registration service...")
         self.running = True
 
         # Start worker thread
