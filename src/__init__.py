@@ -1,7 +1,7 @@
 """
 Registration Service Package
 
-Unified AAS registration service for BaSyx.
+Registration service for BaSyx.
 
 Responsibilities (the AAS is THE ONLY TRUTH):
 - Convert IDTA templates into Pydantic classes (see third_party/aas_pydantic)
@@ -39,7 +39,7 @@ from .config_parser import (
 )
 
 # Unified service
-from .unified_service import UnifiedRegistrationService
+from .registration_service import RegistrationService
 from .mqtt_config_registration import MQTTConfigRegistrationService
 
 # AAS Generation — IDTA-compliant via aas_pydantic
@@ -62,7 +62,7 @@ __all__ = [
     # Config parsing
     'parse_config_file', 'parse_config_data',
     # Unified service
-    'UnifiedRegistrationService',
+    'RegistrationService',
     'MQTTConfigRegistrationService',
     # AAS Generation
     'build_from_dict', 'build_from_json',

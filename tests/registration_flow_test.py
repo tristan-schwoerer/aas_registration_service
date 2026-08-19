@@ -28,7 +28,7 @@ sys.path.insert(0, str(_HERE.parent / "third_party" / "aas_pydantic"))
 
 from src import (  # noqa: E402
     BaSyxConfig,
-    UnifiedRegistrationService,
+    RegistrationService,
 )
 from src.config_parser import parse_config_file  # noqa: E402
 from src.aas_idta.builder import build_from_json  # noqa: E402
@@ -158,7 +158,7 @@ def test_full_registration(config_path: Path, basyx_url: str = ""):
     except ImportError:
         pytest.skip("requests not installed")
 
-    service = UnifiedRegistrationService(
+    service = RegistrationService(
         config=BaSyxConfig(base_url=basyx_url),
     )
     assert service.register_from_config(str(config_path))
@@ -195,7 +195,7 @@ def main():
         print(f"aas generation: {results['aas_generation']} ({len(shells)} shells, {len(submodels)} submodels)")
 
         if args.with_basyx:
-            service = UnifiedRegistrationService(
+            service = RegistrationService(
                 config=BaSyxConfig(base_url=args.basyx_url),
             )
             results["full_registration"] = "PASSED" if service.register_from_config(str(config_path)) else "FAILED"

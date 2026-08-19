@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unified AAS Registration Service - CLI Entry Point
+Registration Service - CLI Entry Point
 
 This service:
 1. Parses JSON configuration files matching the ResourceTypeAAS schema
@@ -13,16 +13,16 @@ Operation-Delegation processing happens here anymore.
 
 Usage:
     # Register from JSON config
-    python unified-registration-service.py register-config path/to/config.json
+    python registration-service.py register-config path/to/config.json
 
     # Register all configs from a directory
-    python unified-registration-service.py register-dir path/to/configs/
+    python registration-service.py register-dir path/to/configs/
 
     # Start MQTT listener for config-based registration
-    python unified-registration-service.py listen
+    python registration-service.py listen
 
     # List registered AAS
-    python unified-registration-service.py list
+    python registration-service.py list
 """
 
 import argparse
@@ -32,7 +32,7 @@ from pathlib import Path
 
 from src import (
     BaSyxConfig,
-    UnifiedRegistrationService,
+    RegistrationService,
     MQTTConfigRegistrationService,
 )
 from src.core.constants import (
@@ -53,7 +53,7 @@ logger = logging.getLogger(__name__)
 def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
-        description='Unified AAS Registration Service - Register assets from JSON configs',
+        description='Registration Service - Register assets from JSON configs',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -153,7 +153,7 @@ Examples:
                 logger.error(f"Config file not found: {config_path}")
                 sys.exit(1)
 
-            service = UnifiedRegistrationService(config=basyx_config)
+            service = RegistrationService(config=basyx_config)
 
             logger.info(f"Registering from config: {config_path}")
             success = service.register_from_config(config_path=str(config_path))
@@ -177,7 +177,7 @@ Examples:
                 logger.error(f"No JSON files found in {config_dir}")
                 sys.exit(1)
 
-            service = UnifiedRegistrationService(config=basyx_config)
+            service = RegistrationService(config=basyx_config)
 
             logger.info(
                 f"Registering {len(config_paths)} configs from {config_dir}")
@@ -199,7 +199,7 @@ Examples:
 
         elif args.command == 'listen':
             # Start MQTT listener
-            service = UnifiedRegistrationService(config=basyx_config)
+            service = RegistrationService(config=basyx_config)
 
             mqtt_service = MQTTConfigRegistrationService(
                 registration_service=service,
@@ -248,7 +248,7 @@ Examples:
                 sys.exit(0)
 
         elif args.command == 'list':
-            service = UnifiedRegistrationService(config=basyx_config)
+            service = RegistrationService(config=basyx_config)
 
             registered = service.list_registered_assets()
             shells = registered.get('aas_shells', [])

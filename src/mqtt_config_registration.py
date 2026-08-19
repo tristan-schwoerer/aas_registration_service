@@ -1,11 +1,11 @@
 """
-MQTT Registration Listener for Unified Registration Service
+MQTT Registration Listener for the Registration Service
 
 Listens for asset registration messages via MQTT and processes JSON configs.
 
 On each config message the listener deep-merges the received JSON config with
 the filled-out asset template, builds the AAS and posts it to BaSyx (see
-``UnifiedRegistrationService.register_from_data``).  No further processing is
+``RegistrationService.register_from_data``).  No further processing is
 done here — the published AAS is the single source of truth for downstream
 services.
 """
@@ -18,7 +18,7 @@ import time
 from typing import Dict, Any, Optional
 import paho.mqtt.client as mqtt
 
-from .unified_service import UnifiedRegistrationService
+from .registration_service import RegistrationService
 
 logger = logging.getLogger(__name__)
 
@@ -33,17 +33,17 @@ class MQTTConfigRegistrationService:
     """
 
     def __init__(self,
-                 registration_service: UnifiedRegistrationService,
+                 registration_service: RegistrationService,
                  mqtt_broker: str = "192.168.0.104",
                  mqtt_port: int = 1883,
                  config_topic: str = "NN/Nybrovej/InnoLab/Registration/Config",
                  response_topic: str = "NN/Nybrovej/InnoLab/Registration/Response",
-                 client_id: str = "unified-registration-service"):
+                 client_id: str = "registration-service"):
         """
         Initialize MQTT registration listener.
 
         Args:
-            registration_service: UnifiedRegistrationService instance
+            registration_service: RegistrationService instance
             mqtt_broker: MQTT broker hostname/IP
             mqtt_port: MQTT broker port
             config_topic: Topic for YAML config registration

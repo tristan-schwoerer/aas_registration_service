@@ -1,4 +1,4 @@
-# Unified AAS Registration Service
+# Registration Service
 
 Registers Asset Administration Shells (AAS) from JSON configuration files.
 
@@ -34,8 +34,8 @@ Submodules:
 ## Setup
 
 ```bash
-git clone git@github.com:tristan-schwoerer/aas_registration_service.git
-cd aas_registration_service
+git clone git@github.com:tristan-schwoerer/registration_service.git
+cd registration_service
 git submodule update --init --recursive
 pip install -r requirements.txt
 ```
@@ -60,11 +60,11 @@ pip install -r requirements.txt
 
 ```bash
 # In Docker (aas-env / aas-registry / sm-registry resolve on the network)
-python unified-registration-service.py register-config AASDescriptions/Resource/configs/syntegonStoppering.json
+python registration-service.py register-config AASDescriptions/Resource/configs/syntegonStoppering.json
 
 # From the host (pass the registry URLs explicitly — global options come
 # before the subcommand)
-python unified-registration-service.py \
+python registration-service.py \
   --basyx-url http://localhost:8081 \
   --aas-registry-url http://localhost:8082 \
   --sm-registry-url http://localhost:8083 \
@@ -72,7 +72,7 @@ python unified-registration-service.py \
   ../AASDescriptions/Resource/configs/syntegonStoppering.json
 
 # Register all configs from a directory
-python unified-registration-service.py register-dir AASDescriptions/Resource/configs/
+python registration-service.py register-dir AASDescriptions/Resource/configs/
 ```
 
 ### MQTT Listener
@@ -80,7 +80,7 @@ python unified-registration-service.py register-dir AASDescriptions/Resource/con
 Start the service in listening mode to accept dynamic registration requests:
 
 ```bash
-python unified-registration-service.py listen \
+python registration-service.py listen \
   --mqtt-broker 192.168.0.104 \
   --mqtt-port 1883 \
   --basyx-url http://localhost:8081
@@ -119,7 +119,7 @@ an AAS and posted to BaSyx.
 ### List registered AAS
 
 ```bash
-python unified-registration-service.py list
+python registration-service.py list
 ```
 
 ## Architecture
@@ -127,7 +127,7 @@ python unified-registration-service.py list
 The registration service consists of:
 
 1. **config_parser**: Deep-merges the JSON config with the asset template, validates against `ResourceTypeAAS`, injects IDs and enriches config-declared AID datapoints with their JSON Schema structures
-2. **UnifiedRegistrationService**: Orchestrates the registration workflow (parse → build AAS → post to BaSyx)
+2. **RegistrationService**: Orchestrates the registration workflow (parse → build AAS → post to BaSyx)
 3. **MQTTConfigRegistrationService**: MQTT listener for dynamic registration
 
 ### Workflow

@@ -1,5 +1,5 @@
 """
-Unified AAS Registration Service
+Registration Service
 
 The registration service's only responsibilities:
 1. Convert IDTA templates into Pydantic classes (generator, separate script)
@@ -34,7 +34,7 @@ from .utils import encode_aas_id
 logger = logging.getLogger(__name__)
 
 
-class UnifiedRegistrationService:
+class RegistrationService:
     """
     Registration service: parse config → build AAS → post to BaSyx.
 

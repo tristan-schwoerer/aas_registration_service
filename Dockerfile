@@ -18,4 +18,4 @@ ENV PYTHONUNBUFFERED=1
 
 # Default command runs the unified service as the MQTT registration listener
 # (deep merge → AAS → post to BaSyx). Override via docker-compose.yml.
-CMD ["python", "unified-registration-service.py", "listen"]
+CMD ["python", "registration-service.py", "listen"]
