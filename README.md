@@ -59,7 +59,17 @@ pip install -r requirements.txt
 ### Register from a JSON config
 
 ```bash
+# In Docker (aas-env / aas-registry / sm-registry resolve on the network)
 python unified-registration-service.py register-config AASDescriptions/Resource/configs/syntegonStoppering.json
+
+# From the host (pass the registry URLs explicitly — global options come
+# before the subcommand)
+python unified-registration-service.py \
+  --basyx-url http://localhost:8081 \
+  --aas-registry-url http://localhost:8082 \
+  --sm-registry-url http://localhost:8083 \
+  register-config \
+  ../AASDescriptions/Resource/configs/syntegonStoppering.json
 
 # Register all configs from a directory
 python unified-registration-service.py register-dir AASDescriptions/Resource/configs/

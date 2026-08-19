@@ -57,8 +57,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  Register from JSON config:
+  Register from JSON config (in Docker):
     %(prog)s register-config AASDescriptions/Resource/configs/syntegonStoppering.json
+
+  Register from JSON config (from the host, with registry URLs):
+    %(prog)s --basyx-url http://localhost:8081 \
+      --aas-registry-url http://localhost:8082 \
+      --sm-registry-url http://localhost:8083 \
+      register-config ../AASDescriptions/Resource/configs/syntegonStoppering.json
 
   Register all configs from directory:
     %(prog)s register-dir AASDescriptions/Resource/configs/
@@ -74,6 +80,12 @@ Examples:
     # Global options
     parser.add_argument('--basyx-url', default=DEFAULT_BASYX_URL,
                         help=f'BaSyx server base URL (default: {DEFAULT_BASYX_URL})')
+    parser.add_argument('--aas-registry-url', default=None,
+                        help='AAS registry base URL, e.g. http://localhost:8082 '
+                             '(default: in-container http://aas-registry:8080)')
+    parser.add_argument('--sm-registry-url', default=None,
+                        help='Submodel registry base URL, e.g. http://localhost:8083 '
+                             '(default: in-container http://sm-registry:8080)')
     parser.add_argument('--mqtt-broker', default=DEFAULT_MQTT_BROKER,
                         help=f'MQTT broker hostname/IP (default: {DEFAULT_MQTT_BROKER})')
     parser.add_argument('--mqtt-port', type=int, default=DEFAULT_MQTT_PORT,
@@ -124,8 +136,14 @@ Examples:
         sys.exit(1)
 
     try:
-        # Initialize BaSyx configuration
-        basyx_config = BaSyxConfig(base_url=args.basyx_url)
+        # Initialize BaSyx configuration (registry URLs default to the
+        # in-container hostnames; pass --aas-registry-url/--sm-registry-url
+        # when running from the host)
+        basyx_config = BaSyxConfig(
+            base_url=args.basyx_url,
+            aas_registry_url=args.aas_registry_url,
+            sm_registry_url=args.sm_registry_url,
+        )
 
         # Execute command
         if args.command == 'register-config':
