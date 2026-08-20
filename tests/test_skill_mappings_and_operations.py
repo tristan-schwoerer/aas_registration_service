@@ -220,30 +220,30 @@ def _mapping_name(mc) -> str:
 
 
 def test_aimc_covers_variables_and_every_skill(store):
+    # Variables mapping lives in MappingConfigurations.
     mapping_list = _aimc_mapping_list(store)
-
     mappings = list(_children(mapping_list))
-    assert len(mappings) >= 3  # Variables + default skills
+    assert mappings
 
-    # Collect sink ids across all mapping configs (SML items carry their real
-    # id_short in a temp Property — see ``_mapping_name``).
     sink_ids = set()
     for mc in mappings:
         sinks = _child(mc, "Sinks")
         for snk in _children(sinks):
             sink_id = _child(snk, "SinkId")
             sink_ids.add(sink_id.value)
-
-    # Variables mapping covers PackMLState + OccupationState.
     assert {"PackMLState", "OccupationState"} <= sink_ids
 
-    # Skill mappings cover every CCI skill (native MQTT action → REST action).
+    # Every CCI skill is covered by TWO directional mappings (request +
+    # response) in MappingConfigurations.
     cci = _submodel(store, "ControlComponentInstance")
     skills = _child(cci, "Skills")
     skill_names = {c.id_short for c in _children(skills)}
-    assert skill_names <= sink_ids
+    mapping_names = [_mapping_name(m) for m in mappings]
+    for name in skill_names:
+        assert mapping_names.count(name) == 1, f"skill {name} needs a response mapping"
+        assert mapping_names.count(f"{name}Request") == 1, f"skill {name} needs a request mapping"
 
-    # Each skill mapping has a Lua transformation referencing its skill.
+    # Each mapping has a Lua transformation referencing its source.
     for mc in mappings:
         transformation = _child(mc, "Transformation")
         assert isinstance(transformation, model.Blob)
@@ -274,11 +274,48 @@ def test_aimc_skill_mapping_sources_sinks_reference_native_and_rest(store):
             assert any("properties" in r and r[-1] == "StationState" for r in source_refs)
             continue
 
-        # A skill mapping: source = native MQTT action, sink = REST action.
-        assert source_refs and source_refs[0][-1] == name
-        assert "interface_mqtt" in source_refs[0]
-        assert sink_refs and sink_refs[0][-1] == name
-        assert "interface_rest" in sink_refs[0]
+
+def test_aimc_skill_mappings_are_request_and_response_directions(store):
+    """Each skill has TWO plain directional MappingConfigurations:
+    request (REST action → MQTT action) and response (MQTT action → REST
+    action), each with its own Lua blob."""
+    mapping_list = _aimc_mapping_list(store)
+
+    directions = {}  # skill -> set of direction tuples
+    for mc in list(_children(mapping_list)):
+        sources = _children(_child(mc, "Sources"))
+        sinks = _children(_child(mc, "Sinks"))
+        src = _key_values(_child(sources[0], "Source").value)
+        snk = _key_values(_child(sinks[0], "Sink").value)
+        if src[-1] == "StationState":
+            continue  # the Variables mapping
+        skill = src[-1]
+        directions.setdefault(skill, set()).add((
+            "interface_rest" in src, "interface_mqtt" in src,
+            "interface_mqtt" in snk, "interface_rest" in snk,
+        ))
+
+    cci = _submodel(store, "ControlComponentInstance")
+    skills = _child(cci, "Skills")
+    skill_names = {c.id_short for c in _children(skills)}
+    assert skill_names <= set(directions)
+
+    for name, dirs in directions.items():
+        # request: REST source → MQTT sink; response: MQTT source → REST sink
+        assert (True, False, True, False) in dirs, f"{name}: missing request direction"
+        assert (False, True, False, True) in dirs, f"{name}: missing response direction"
+
+    # Each direction carries its own Lua transformation blob.
+    for mc in list(_children(mapping_list)):
+        sources = _children(_child(mc, "Sources"))
+        src = _key_values(_child(sources[0], "Source").value)
+        if src[-1] == "StationState":
+            continue
+        transformation = _child(mc, "Transformation")
+        assert isinstance(transformation, model.Blob)
+        lua = bytes(transformation.value).decode("utf-8")
+        assert "aimc_main" in lua
+        assert "sources." in lua
 
 
 def _config_with_write_delegated_location():

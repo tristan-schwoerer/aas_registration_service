@@ -19,7 +19,8 @@ from .control_component_instance import (
 )
 from .asset_interfaces_mapping_configuration import (
     asset_interfaces_mapping_configuration,
-    skill_mapping_configuration, variables_mapping_configuration,
+    skill_mapping_configuration, skill_request_mapping_configuration,
+    variables_mapping_configuration,
     property_mapping_configuration,
 )
 from .property_delegation import (
@@ -46,6 +47,7 @@ __all__ = [
     "skill_ref",
     "asset_interfaces_mapping_configuration",
     "skill_mapping_configuration",
+    "skill_request_mapping_configuration",
     "variables_mapping_configuration",
     "property_mapping_configuration",
     "write_delegation_qualifier",
