@@ -26,14 +26,14 @@ import json
 import logging
 from typing import Any, Dict
 
-from .templates.resource_template.asset import ResourceTypeAAS
-from .templates.resource_template.asset_interfaces_description import (
+from aas_model.resource_template.asset import ResourceTypeAAS
+from aas_model.resource_template.asset_interfaces_description import (
     ensure_aid_datapoint_schemas,
 )
-from .templates.builder import merge_instance_config
-from .templates.id_injector import inject_ids
-from .templates.constants import DELEGATION_BASE
-from .templates.resource_template.property_delegation import (
+from aas_model.builder import merge_instance_config
+from aas_model.id_injector import inject_ids
+from aas_model.constants import DELEGATION_BASE
+from aas_model.resource_template.property_delegation import (
     ensure_property_write_delegation,
 )
 

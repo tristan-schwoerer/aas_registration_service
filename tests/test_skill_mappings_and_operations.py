@@ -29,7 +29,7 @@ from basyx.aas import model
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "third_party", "aas_pydantic")))
 
-from src.templates.builder import build_from_json  # noqa: E402
+from aas_model import build_from_json  # noqa: E402
 
 CONFIG_PATH = os.environ.get(
     "AAS_TEST_CONFIG",
@@ -90,7 +90,7 @@ def test_delegation_base_derives_from_asset_id_short():
         data = json.load(f)
     data.pop("delegation_base", None)
 
-    from src.templates.builder import build_from_dict
+    from aas_model import build_from_dict
 
     cci = _submodel(build_from_dict(data), "ControlComponentInstance")
     skills = _child(cci, "Skills")
@@ -110,7 +110,7 @@ def test_delegation_base_config_override_is_respected():
         data = json.load(f)
     data["delegation_base"] = "http://{dmp_host}.robotics.svc.cluster.local:8080"
 
-    from src.templates.builder import build_from_dict
+    from aas_model import build_from_dict
 
     cci = _submodel(build_from_dict(data), "ControlComponentInstance")
     skills = _child(cci, "Skills")

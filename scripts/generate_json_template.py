@@ -18,9 +18,9 @@ import os
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, ".."))
-sys.path.insert(0, os.path.join(_HERE, "..", "third_party", "aas_pydantic"))
+sys.path.insert(0, os.path.abspath(os.path.join(_HERE, "..", "..", "aas-model", "src")))
 
-from src.templates.builder import generate_station_template
+from aas_model import generate_station_template
 
 
 def main():

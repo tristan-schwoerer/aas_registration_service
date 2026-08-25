@@ -20,7 +20,7 @@ from basyx.aas import model
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "third_party", "aas_pydantic")))
 
-from src.templates.builder import build_from_json  # noqa: E402
+from aas_model import build_from_json  # noqa: E402
 
 CONFIG_PATH = os.environ.get(
     "AAS_TEST_CONFIG",

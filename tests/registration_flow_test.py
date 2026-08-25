@@ -31,7 +31,7 @@ from src import (  # noqa: E402
     RegistrationService,
 )
 from src.config_parser import parse_config_file  # noqa: E402
-from src.templates.builder import build_from_json  # noqa: E402
+from aas_model import build_from_json  # noqa: E402
 
 # The current Resource config (JSON, ResourceTypeAAS schema).  Defaults to the
 # AP2030-UNS asset config (this repo is consumed as a submodule at

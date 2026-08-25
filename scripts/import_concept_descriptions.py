@@ -28,7 +28,7 @@ import requests
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, ".."))
-sys.path.insert(0, os.path.join(_HERE, "..", "third_party", "aas_pydantic"))
+sys.path.insert(0, os.path.abspath(os.path.join(_HERE, "..", "..", "aas-model", "src")))
 
 # The IDTA templates the generator builds from — their conceptDescriptions
 # cover the semanticIds the generated AASs reference.

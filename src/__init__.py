@@ -42,12 +42,12 @@ from .config_parser import (
 from .registration_service import RegistrationService
 from .mqtt_config_registration import MQTTConfigRegistrationService
 
-# AAS Generation — IDTA-compliant via aas_pydantic
-from .templates import (
+# AAS Generation — the shared data-model package (ADR-016)
+from aas_model import (
     build_from_dict, build_from_json, build_resource_type_aas,
-    generate_station_template, inject_ids,
-    ResourceTypeAAS, templates as idta_templates,
+    generate_station_template, inject_ids, ResourceTypeAAS,
 )
+from aas_model import submodel_templates as idta_templates
 
 __all__ = [
     # Core

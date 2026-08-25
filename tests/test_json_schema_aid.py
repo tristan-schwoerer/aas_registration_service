@@ -19,18 +19,18 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "third_party", "aas_pydantic")))
 
-from src.templates.constants import SCHEMA_BASE  # noqa: E402
-from src.templates.json_schema_aid import (  # noqa: E402
+from aas_model.constants import SCHEMA_BASE  # noqa: E402
+from aas_model.json_schema_aid import (  # noqa: E402
     datapoint_from_schema,
     load_schema,
     populate_datapoint,
 )
-from src.templates.resource_template.asset_interfaces_description import (  # noqa: E402
+from aas_model.resource_template.asset_interfaces_description import (  # noqa: E402
     asset_interfaces_description,
     mqtt_action,
     mqtt_property,
 )
-from src.templates.submodel_templates.mqtt_aid import MqttForm, MqttProperty  # noqa: E402
+from aas_model.submodel_templates.mqtt_aid import MqttForm, MqttProperty  # noqa: E402
 
 
 def _station_state_schema():

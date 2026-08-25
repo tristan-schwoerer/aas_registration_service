@@ -22,7 +22,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(_HERE, "..", "third_party", "aas_pydantic"))
+sys.path.insert(0, os.path.abspath(os.path.join(_HERE, "..", "..", "aas-model", "src")))
 
 from aas_pydantic.submodel_templates.nameplate import (
     Nameplate, URIOfTheProduct, ManufacturerName, ManufacturerProductDesignation,
@@ -44,7 +44,7 @@ from aas_pydantic.submodel_templates.capability_description import (
 # within it), so add the repo root to sys.path.
 sys.path.insert(0, os.path.join(_HERE, ".."))
 
-from src.templates.submodel_templates.control_component_instance import ExtendedSkill
+from aas_model.submodel_templates.control_component_instance import ExtendedSkill
 from aas_pydantic.submodel_templates.control_component_instance import (
     ControlComponentInstance,
     Endpoint,

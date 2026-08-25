@@ -17,3 +17,10 @@ PyYAML>=6.0.0
 
 # Loading .env for register_all_assets.py
 python-dotenv>=1.0.0
+
+# Shared AAS data-model package (ADR-016) — single source of truth for the whole
+# data model (vendored aas_pydantic + generated IDTA templates + resource
+# templates + build/schema helpers + MQTTSchemas). Shared with
+# aas-camel-dmp/management-node. Registered as a git submodule (aas-model);
+# for packaging, install from the remote:
+git+https://github.com/tristan-schwoerer/aas-model.git

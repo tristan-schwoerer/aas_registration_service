@@ -9,7 +9,7 @@ from typing import Final
 import os
 
 # SemanticIdCatalog removed — semantic IDs are inline on Pydantic models.
-# See src/templates/ for the IDTA-compliant replacements.
+# See the aas_model package (ADR-016) for the IDTA-compliant replacements.
 
 
 # Default network configuration
