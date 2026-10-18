@@ -5,9 +5,8 @@ The registration service's only responsibilities:
 1. Convert IDTA templates into Pydantic classes (generator, separate script)
 2. Modify/extend/add Pydantic classes to define submodel/asset templates
 3. Generate a JSON template for asset templates
-4. Deep-merge the filled-out asset template with the JSON config received
-   via MQTT (or from a file)
-5. Post the AAS to BaSyx
+4. Validate an exported Resource model received via MQTT or from a file
+5. Build and post the AAS to BaSyx
 
 The AAS is THE ONLY TRUTH: topics.json generation, Operation Delegation
 entries, DataBridge configurations and the rest of the former "processing"
@@ -22,7 +21,7 @@ from typing import Dict, List, Any, Optional
 
 from .config import BaSyxConfig
 from .config_parser import parse_config_file, parse_config_data
-from aas_model import build_from_dict
+from aas_model import build_from_model
 from .core import (
     HTTPClient,
     DEFAULT_GITHUB_PAGES_URL,
@@ -39,8 +38,7 @@ class RegistrationService:
     Registration service: parse config → build AAS → post to BaSyx.
 
     Workflow:
-    1. Parse + validate the JSON config (deep merge of filled-out asset
-       template + instance config) via ``config_parser``
+    1. Parse + validate exported Resource model JSON via ``config_parser``
     2. Generate the AAS via the Pydantic → aas_pydantic → BaSyx pipeline
     3. Register AAS with the BaSyx server (repositories + registries)
     """
@@ -64,7 +62,7 @@ class RegistrationService:
         """
         Register an asset from its JSON configuration file.
 
-        1. Parse + validate JSON config against ResourceTypeAAS
+        1. Parse + validate exported Resource model JSON
         2. Generate AAS via Pydantic → BaSyx pipeline
         3. Register with BaSyx server
 
@@ -82,7 +80,7 @@ class RegistrationService:
             system_id = asset.id_short
             logger.info(f"Registering asset: {system_id}")
 
-            # Step 2: Generate AAS (validate + convert in one step)
+            # Step 2: Convert the validated Resource model to AAS
             logger.info("Generating AAS description...")
             aas_json = self._generate_aas(asset)
 
@@ -112,7 +110,7 @@ class RegistrationService:
         Used by the MQTT listener for dynamic registration.
 
         Args:
-            config_data: JSON config dict matching ResourceTypeAAS schema
+            config_data: JSON export of a Python-authored Resource model
 
         Returns:
             True if registration successful
@@ -164,10 +162,10 @@ class RegistrationService:
 
     def _generate_aas(self, asset) -> Optional[Dict]:
         """
-        Convert a validated ResourceTypeAAS instance to BaSyx JSON.
+        Convert a validated Resource instance to BaSyx JSON.
 
         Args:
-            asset: Validated ResourceTypeAAS Pydantic instance
+            asset: Validated Resource Pydantic instance
 
         Returns:
             BaSyx-compatible JSON dict, or None on failure
@@ -176,8 +174,7 @@ class RegistrationService:
             from basyx.aas.adapter.json import json_serialization
             from aas_pydantic.convert_util import strip_temp_id_short_attributes
 
-            # Convert Pydantic model directly (no raw dict needed)
-            obj_store = build_from_dict(asset.model_dump())
+            obj_store = build_from_model(asset)
 
             # AASd-120 SML items park their id_short in a synthetic temp
             # Property during conversion — strip it so it never appears in the

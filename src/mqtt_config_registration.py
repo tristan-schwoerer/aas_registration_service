@@ -3,8 +3,8 @@ MQTT Registration Listener for the Registration Service
 
 Listens for asset registration messages via MQTT and processes JSON configs.
 
-On each config message the listener deep-merges the received JSON config with
-the filled-out asset template, builds the AAS and posts it to BaSyx (see
+On each config message the listener validates the exported Resource model,
+builds the AAS and posts it to BaSyx (see
 ``RegistrationService.register_from_data``).  No further processing is
 done here — the published AAS is the single source of truth for downstream
 services.
@@ -177,20 +177,24 @@ class MQTTConfigRegistrationService:
         {
             "requestId": "unique-id",
             "assetId": "asset-identifier",
-            "config": { ... JSON config matching ResourceTypeAAS schema ... }
+            "config": { ... exported Resource model JSON ... }
         }
         """
         try:
             message = json.loads(payload)
-            request_id = message.get('requestId', 'unknown')
-            asset_id = message.get('assetId', 'unknown')
 
-            if 'config' not in message:
-                logger.error("No 'config' field in JSON message")
-                self._send_response(request_id, False, "Missing config data")
-                return
-
-            config_data = message['config']
+            if 'config' in message:
+                # documented wrapper: {requestId, assetId, config: {...}}
+                request_id = message.get('requestId', 'unknown')
+                asset_id = message.get('assetId', 'unknown')
+                config_data = message['config']
+            else:
+                # RAW payload: the topic contract derives asset identity from
+                # the config itself (the simulated stations publish the file
+                # content unchanged)
+                request_id = 'raw'
+                asset_id = message.get('id_short') or 'unknown'
+                config_data = message
 
             logger.info(f"Received config registration for: {asset_id}")
 
@@ -251,13 +255,10 @@ class MQTTConfigRegistrationService:
 
     def _worker_loop(self):
         """
-        Worker thread that processes registration queue with batch optimization.
+        Worker thread that processes the registration queue one item at a time.
 
-        Instead of restarting the databridge after every registration, this worker:
-        1. Processes all queued registrations without restarting databridge
-        2. After the queue is empty and a debounce period passes, restarts databridge once
-
-        This significantly improves performance when multiple assets register simultaneously.
+        Nothing is restarted after a registration: the DMP follows the repository's
+        submodel events and installs the new mappings itself.
         """
         logger.info("Registration worker started")
 
@@ -305,7 +306,7 @@ class MQTTConfigRegistrationService:
         logger.info("Registration worker stopped")
 
     def _process_config_registration(self, item: Dict[str, Any]) -> bool:
-        """Process config-based registration (deep merge → build AAS → post)."""
+        """Process exported Resource JSON (validate → build AAS → post)."""
         try:
             config_data = item.get('config_data')
             return self.registration_service.register_from_data(

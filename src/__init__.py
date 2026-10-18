@@ -4,11 +4,8 @@ Registration Service Package
 Registration service for BaSyx.
 
 Responsibilities (the AAS is THE ONLY TRUTH):
-- Convert IDTA templates into Pydantic classes (see third_party/aas_pydantic)
-- Modify/extend/add Pydantic classes to define submodel/asset templates
-- Generate a JSON template for asset templates
-- Deep-merge the filled-out asset template with the JSON config received via MQTT
-- Post the AAS to BaSyx
+- Validate exported Python-authored Resource models
+- Build and post the AAS to BaSyx
 """
 
 from .config import BaSyxConfig
@@ -33,7 +30,7 @@ from .utils import (
     topic_to_id,
 )
 
-# Config parsing (deep merge + validation only)
+# Config parsing (validation only)
 from .config_parser import (
     parse_config_file, parse_config_data,
 )
@@ -43,10 +40,7 @@ from .registration_service import RegistrationService
 from .mqtt_config_registration import MQTTConfigRegistrationService
 
 # AAS Generation — the shared data-model package (ADR-016)
-from aas_model import (
-    build_from_dict, build_from_json, build_resource_type_aas,
-    generate_station_template, inject_ids, ResourceTypeAAS,
-)
+from aas_model import Resource, build_from_model
 from aas_model import submodel_templates as idta_templates
 
 __all__ = [
@@ -65,7 +59,5 @@ __all__ = [
     'RegistrationService',
     'MQTTConfigRegistrationService',
     # AAS Generation
-    'build_from_dict', 'build_from_json',
-    'build_resource_type_aas', 'generate_station_template', 'inject_ids',
-    'ResourceTypeAAS', 'idta_templates',
+    'Resource', 'build_from_model', 'idta_templates',
 ]

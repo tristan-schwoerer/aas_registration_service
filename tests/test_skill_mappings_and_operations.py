@@ -1,4 +1,4 @@
-"""Skill operations + AIMC skill mappings — templates flow tests.
+"""Skill operations + AIMC skill mappings — Resource model tests.
 
 Verifies the operation-delegation wiring added to the Resource AAS:
 
@@ -8,18 +8,21 @@ Verifies the operation-delegation wiring added to the Resource AAS:
   action.
 - The CCI ``endpoints`` container holds, per skill, an annotated
   RelationshipElement (``this skill has this native interface``).
-- The AID carries an ``interface_rest`` (operation-delegation) with one action
-  per skill.
+- The AID carries one native MQTT action per skill (the DMP v3 AID models
+  ONLY the device's own communication — the caller-facing REST side is
+  derived by convention, never declared).
 - The AIMC carries a Variables mapping (StationState → PackMLState /
-  OccupationState) plus one skill MappingConfiguration per CCI skill
-  (native MQTT action → REST action) with a Lua transformation.
+  OccupationState) plus ONE operation-delegation MappingConfiguration per CCI
+  skill (source = the skill's Operation SubmodelElement, sink = the skill's
+  native MQTT command affordance) with a Lua request blob.
 
-The tests use the AP2030-UNS resource config (see ``CONFIG_PATH``); override
-with ``AAS_TEST_CONFIG``, or they are skipped.
+The tests use the Python-authored Stoppering Resource factory.
 """
 
 from __future__ import annotations
 
+import copy
+import json
 import os
 import sys
 
@@ -27,24 +30,9 @@ import pytest
 from basyx.aas import model
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "third_party", "aas_pydantic")))
 
-from aas_model import build_from_json  # noqa: E402
-
-CONFIG_PATH = os.environ.get(
-    "AAS_TEST_CONFIG",
-    os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "AASDescriptions",
-                     "Resource", "configs", "syntegonStoppering.json")
-    ),
-)
-
-if not os.path.exists(CONFIG_PATH):
-    pytest.skip(
-        f"AAS test config not found: {CONFIG_PATH} (set AAS_TEST_CONFIG to override)",
-        allow_module_level=True,
-    )
-
+from aas_model import build_from_model  # noqa: E402
+from aas_model.resource_instances.stopperingModule import syntegon_stoppering  # noqa: E402
 
 def _children(el) -> list:
     """Children of a basyx Submodel / SMC (``submodel_element`` or ``value``)."""
@@ -77,48 +65,83 @@ def _key_values(ref) -> list[str]:
 
 @pytest.fixture(scope="module")
 def store():
-    return build_from_json(CONFIG_PATH)
+    return build_from_model(syntegon_stoppering())
 
 
-def test_delegation_base_derives_from_asset_id_short():
-    """Without a ``delegation_base`` config key, the DMP host is derived from
-    the asset id_short (unique per asset) as ``dmp-<id_short>`` lowercased —
-    the K8s Service name convention."""
-    import json
+def test_registration_does_not_synthesize_missing_invocation_qualifier():
+    from aas_model import Resource
 
-    with open(CONFIG_PATH) as f:
-        data = json.load(f)
-    data.pop("delegation_base", None)
-
-    from aas_model import build_from_dict
-
-    cci = _submodel(build_from_dict(data), "ControlComponentInstance")
-    skills = _child(cci, "Skills")
-    halt = next(s for s in _children(skills) if s.id_short == "Halt")
-    op = _child(halt, "operation")
-    deleg = next(q for q in op.qualifier if q.type == "invocationDelegation")
-    assert deleg.value.startswith("http://dmp-syntegonstopperingsystemaas:8080")
-    assert deleg.value.endswith("/operations/syntegonStopperingSystemAAS/Halt")
+    data = json.loads(syntegon_stoppering().model_dump_json())
+    halt_data = data["control_component_instance"]["Skills"]["Skill"]["Halt"]["operation"]
+    halt_data["qualifiers"] = [
+        q for q in halt_data["qualifiers"] if q["type_"] != "invocationDelegation"
+    ]
+    asset = Resource.model_validate(data)
+    assert not any(
+        q.type_ == "invocationDelegation"
+        for q in asset.control_component_instance.Skills.Skill["Halt"].operation.qualifiers
+    )
 
 
-def test_delegation_base_config_override_is_respected():
-    """An explicit ``delegation_base`` config key (which may itself use the
-    ``{dmp_host}`` macro) overrides the derived default."""
-    import json
+def test_registration_preserves_concrete_invocation_url():
+    from src.config_parser import parse_config_data
 
-    with open(CONFIG_PATH) as f:
-        data = json.load(f)
-    data["delegation_base"] = "http://{dmp_host}.robotics.svc.cluster.local:8080"
+    data = json.loads(syntegon_stoppering().model_dump_json())
+    original = copy.deepcopy(data)
+    url = data["control_component_instance"]["Skills"]["Skill"]["Halt"]["operation"]["qualifiers"][0]["value"]
+    asset = parse_config_data(data)
+    halt = asset.control_component_instance.Skills.Skill["Halt"]
+    deleg = next(q for q in halt.operation.qualifiers if q.type_ == "invocationDelegation")
+    assert deleg.value == url
+    assert data == original
 
-    from aas_model import build_from_dict
 
-    cci = _submodel(build_from_dict(data), "ControlComponentInstance")
-    skills = _child(cci, "Skills")
-    halt = next(s for s in _children(skills) if s.id_short == "Halt")
-    op = _child(halt, "operation")
-    deleg = next(q for q in op.qualifier if q.type == "invocationDelegation")
-    assert deleg.value.startswith(
-        "http://dmp-syntegonstopperingsystemaas.robotics.svc.cluster.local:8080")
+def test_registration_preserves_authored_invocation_url_string():
+    from src.config_parser import parse_config_data
+
+    data = json.loads(syntegon_stoppering().model_dump_json())
+    data["control_component_instance"]["Skills"]["Skill"]["Halt"]["operation"]["qualifiers"][0]["value"] = (
+        "https://example.invalid/custom/halt"
+    )
+    asset = parse_config_data(data)
+    deleg = next(
+        q for q in asset.control_component_instance.Skills.Skill["Halt"].operation.qualifiers
+        if q.type_ == "invocationDelegation"
+    )
+    assert deleg.value == "https://example.invalid/custom/halt"
+
+
+def test_registration_preserves_explicitly_empty_qualifiers():
+    from src.config_parser import parse_config_data
+
+    data = json.loads(syntegon_stoppering().model_dump_json())
+    data["control_component_instance"]["Skills"]["Skill"]["Halt"]["operation"]["qualifiers"] = []
+    asset = parse_config_data(data)
+    assert asset.control_component_instance.Skills.Skill["Halt"].operation.qualifiers == []
+
+
+def test_registration_rejects_malformed_field_types_and_unknown_fields():
+    from pydantic import ValidationError
+    from src.config_parser import parse_config_data
+
+    data = json.loads(syntegon_stoppering().model_dump_json())
+    data["control_component_instance"]["Skills"]["Skill"]["Halt"]["operation"]["qualifiers"][0]["value"] = 42
+    with pytest.raises(ValidationError):
+        parse_config_data(data)
+
+    data = json.loads(syntegon_stoppering().model_dump_json())
+    data["unexpected_field"] = True
+    with pytest.raises(ValidationError):
+        parse_config_data(data)
+
+
+def test_registration_rejects_retired_delegation_config():
+    from src.config_parser import parse_config_data
+
+    data = json.loads(syntegon_stoppering().model_dump_json())
+    data["delegation_base"] = "http://old-host:8080"
+    with pytest.raises(ValueError, match="delegation_base"):
+        parse_config_data(data)
 
 
 def test_cci_skills_have_operations_with_delegation_and_native_interface_ref(store):
@@ -144,24 +167,22 @@ def test_cci_skills_have_operations_with_delegation_and_native_interface_ref(sto
 
         # operation → invocationDelegation qualifier (plain delegation URL per
         # the current BaSyx wiki example; the DMP host derives from the asset
-        # id_short, lowercased, and the real AAS id_short is substituted for
-        # the macro).
+        # the fixed shared invocation service and exact owner id_short).
         op = _child(skill_el, "operation")
         assert isinstance(op, model.Operation)
         qualifier_types = {q.type for q in op.qualifier}
         assert "invocationDelegation" in qualifier_types
         deleg = next(q for q in op.qualifier if q.type == "invocationDelegation")
-        assert deleg.value.startswith("http://dmp-syntegonstopperingsystemaas:8080")
-        assert deleg.value.endswith(f"/operations/syntegonStopperingSystemAAS/{name}")
+        assert deleg.value == f"http://dmp:8080/operations/syntegonStopperingSystemAAS/{name}"
 
         # Operation variables keep their meaningful names so the AAS Web GUI
-        # can render + manually invoke the operation (Uuid inout; State/Outcome
-        # output for skills with a response).
+        # can render + manually invoke the operation (Uuid inout; State output).
+        # Outcome (the FOND branch discriminator) is NOT a default output —
+        # registration-style skills (Halt/Occupy/Release) answer State only;
+        # FOND-capable process skills declare it explicitly in their configs.
         assert {v.id_short for v in op.in_output_variable} == {"Uuid"}
-        if name in ("Occupy", "Release", "Stoppering"):
-            assert {v.id_short for v in op.output_variable} == {"State", "Outcome"}
-        else:
-            assert len(op.output_variable) == 0
+        if name in ("Halt", "Occupy", "Release"):
+            assert {v.id_short for v in op.output_variable} == {"State"}
 
 
 def test_cci_endpoints_hold_skill_native_interface_relationships(store):
@@ -182,19 +203,43 @@ def test_cci_endpoints_hold_skill_native_interface_relationships(store):
         assert second_keys[-1] == rel.id_short
 
 
-def test_aid_has_rest_operation_delegation_interface(store):
+def test_aid_has_no_caller_facing_rest_interface(store):
+    """DMP v3: the AID models only the device's own communication — the
+    caller-facing REST surface is DERIVED by the DMP, never declared here."""
     aid = _submodel(store, "AssetInterfacesDescription")
-    rest = _child(aid, "interface_rest")
+    children = [c.id_short for c in _children(aid)]
+    assert "interface_rest" not in children
 
-    actions = _child(_child(rest, "InteractionMetadata"), "actions")
-    action_names = {a.id_short for a in _children(actions)}
-    assert {"Halt", "Occupy", "Release"} <= action_names
 
+def test_aid_mqtt_actions_declare_response_topics(store):
+    """Every delegated skill's command affordance declares its reply topic
+    (MQTT 5 request/reply: the correlated leg of the derived interaction)."""
+    aid = _submodel(store, "AssetInterfacesDescription")
+    mqtt = _child(aid, "interface_mqtt")
+    actions = _child(_child(mqtt, "InteractionMetadata"), "actions")
     for action in _children(actions):
         forms = _child(action, "forms")
-        href = _child(forms, "href")
-        assert href.value.startswith("/operations/")
-        assert href.value.endswith(f"/{action.id_short}")
+        assert _child(forms, "mqv_responseTopic").value == f"DATA/{action.id_short}"
+
+
+def test_registration_preserves_authored_mqtt_terms_without_enrichment():
+    from src.config_parser import parse_config_data
+
+    data = json.loads(syntegon_stoppering().model_dump_json())
+    original = copy.deepcopy(data)
+    aid = parse_config_data(data).asset_interfaces_description
+    assert data == original
+    mqtt = aid.InterfaceTemplateForMQTT["interface_mqtt"].InteractionMetadata
+    authored_actions = data["asset_interfaces_description"]["InterfaceTemplateForMQTT"]["interface_mqtt"]["InteractionMetadata"]["actions"]["property_name"]
+    assert set(mqtt.actions.property_name) == set(authored_actions)
+    for name, action in mqtt.actions.property_name.items():
+        assert action.forms.mqv_responseTopic.value == f"DATA/{name}"
+        assert authored_actions[name]["forms"]["mqv_responseTopic"]["value"] == action.forms.mqv_responseTopic.value
+        assert action.forms.op is None, name  # not added: WoT defaults it to invokeaction
+    authored_properties = data["asset_interfaces_description"]["InterfaceTemplateForMQTT"]["interface_mqtt"]["InteractionMetadata"]["properties"]["property_name"]
+    assert set(mqtt.properties.property_name) == set(authored_properties)
+    for name, prop in mqtt.properties.property_name.items():
+        assert prop.forms.model_dump() == authored_properties[name]["forms"], name
 
 
 def _aimc_mapping_list(store):
@@ -233,15 +278,14 @@ def test_aimc_covers_variables_and_every_skill(store):
             sink_ids.add(sink_id.value)
     assert {"PackMLState", "OccupationState"} <= sink_ids
 
-    # Every CCI skill is covered by TWO directional mappings (request +
-    # response) in MappingConfigurations.
+    # Every CCI skill is covered by ONE operation-delegation MappingConfiguration
+    # (DMP v3 one-MC authoring: source = the skill's Operation element).
     cci = _submodel(store, "ControlComponentInstance")
     skills = _child(cci, "Skills")
     skill_names = {c.id_short for c in _children(skills)}
     mapping_names = [_mapping_name(m) for m in mappings]
     for name in skill_names:
-        assert mapping_names.count(name) == 1, f"skill {name} needs a response mapping"
-        assert mapping_names.count(f"{name}Request") == 1, f"skill {name} needs a request mapping"
+        assert mapping_names.count(name) == 1, f"skill {name} needs its operation mapping"
 
     # Each mapping has a Lua transformation referencing its source.
     for mc in mappings:
@@ -251,48 +295,37 @@ def test_aimc_covers_variables_and_every_skill(store):
         assert "aimc_main" in lua
         assert "sources." in lua
 
-
-def test_aimc_skill_mapping_sources_sinks_reference_native_and_rest(store):
-    mapping_list = _aimc_mapping_list(store)
-
-    for mc in list(_children(mapping_list)):
-        name = _mapping_name(mc)
-
-        sources = _child(mc, "Sources")
-        source_refs = []
-        for src in _children(sources):
-            source = _child(src, "Source")
-            source_refs.append(_key_values(source.value))
-        sinks = _child(mc, "Sinks")
-        sink_refs = []
-        for snk in _children(sinks):
-            sink = _child(snk, "Sink")
-            sink_refs.append(_key_values(sink.value))
-
-        # The Variables mapping ("MQTT") points at the StationState property.
-        if name == "MQTT":
-            assert any("properties" in r and r[-1] == "StationState" for r in source_refs)
-            continue
+def _reference_keys(ref) -> list[str]:
+    """Key TYPE + value path of a reference (value pairs as ``type:value``)."""
+    return [f"{k.type}:{k.value}" for k in ref.key]
 
 
-def test_aimc_skill_mappings_are_request_and_response_directions(store):
-    """Each skill has TWO plain directional MappingConfigurations:
-    request (REST action → MQTT action) and response (MQTT action → REST
-    action), each with its own Lua blob."""
+def test_aimc_skill_operation_mappings_are_one_mc(store):
+    """Each skill's operation mapping: SOURCE = the skill's Operation
+    SubmodelElement in the CCI (Operation key type), SINK = the skill's native
+    MQTT command affordance. No caller-facing REST references exist anywhere
+    (DMP v3: the REST surface is derived, never declared)."""
     mapping_list = _aimc_mapping_list(store)
 
     directions = {}  # skill -> set of direction tuples
     for mc in list(_children(mapping_list)):
         sources = _children(_child(mc, "Sources"))
         sinks = _children(_child(mc, "Sinks"))
-        src = _key_values(_child(sources[0], "Source").value)
+        src = _child(sources[0], "Source").value
+        keys = list(src.key)
+        if keys[-1].type != model.KeyTypes.OPERATION:
+            # non-operation mappings (the Variables mapping over the
+            # StationState affordance and the OPC UA measurement data mappings)
+            # source a device/AAS
+            # affordance, never a CCI Operation — not part of this check
+            continue
         snk = _key_values(_child(sinks[0], "Sink").value)
-        if src[-1] == "StationState":
-            continue  # the Variables mapping
-        skill = src[-1]
+        skill = keys[-2].value
         directions.setdefault(skill, set()).add((
-            "interface_rest" in src, "interface_mqtt" in src,
-            "interface_mqtt" in snk, "interface_rest" in snk,
+            "Skills" in _key_values(src),
+            keys[-1].value,
+            "interface_mqtt" in snk,
+            snk[-1] == skill,
         ))
 
     cci = _submodel(store, "ControlComponentInstance")
@@ -301,79 +334,30 @@ def test_aimc_skill_mappings_are_request_and_response_directions(store):
     assert skill_names <= set(directions)
 
     for name, dirs in directions.items():
-        # request: REST source → MQTT sink; response: MQTT source → REST sink
-        assert (True, False, True, False) in dirs, f"{name}: missing request direction"
-        assert (False, True, False, True) in dirs, f"{name}: missing response direction"
+        # one-MC operation authoring: CCI Operation source → native MQTT sink
+        assert (True, "operation", True, True) in dirs, \
+            f"{name}: expected one-MC operation mapping"
 
-    # Each direction carries its own Lua transformation blob.
+    # The operation source key carries the Operation KEY TYPE — the exact
+    # signal the management node classifies the mapping as an interaction from.
+    # Dual-binding legs (the OPC UA mapping of the same CCI operation) name
+    # themselves after the skill too ({skill}Opcua) — the derived REST surface
+    # stays disambiguated by the management node, not by the reference.
     for mc in list(_children(mapping_list)):
         sources = _children(_child(mc, "Sources"))
-        src = _key_values(_child(sources[0], "Source").value)
-        if src[-1] == "StationState":
+        src = _child(sources[0], "Source").value
+        keys = list(src.key)
+        if keys[-1].value != "operation":
             continue
+        assert keys[-1].type == model.KeyTypes.OPERATION
+        name = _mapping_name(mc)
+        assert keys[-2].value == name or name.startswith(keys[-2].value), \
+            f"{name}: owning skill {keys[-2].value!r} must name the mapping"
+
+    # Each mapping carries its Lua request blob.
+    for mc in list(_children(mapping_list)):
         transformation = _child(mc, "Transformation")
         assert isinstance(transformation, model.Blob)
         lua = bytes(transformation.value).decode("utf-8")
         assert "aimc_main" in lua
         assert "sources." in lua
-
-
-def _config_with_write_delegated_location():
-    """The resource config with the ``Location`` parameter opted into property
-    write-delegation via a ``writeDelegation`` qualifier."""
-    import json
-    with open(CONFIG_PATH) as f:
-        data = json.load(f)
-    data["parameters"]["parameter"]["Location"]["qualifiers"] = [
-        {
-            "type_": "writeDelegation",
-            "value": "{delegation_base}/properties/{aas_id_short}/Location",
-            "value_type": "xs:string",
-            "kind": "ConceptQualifier",
-        }
-    ]
-    return data
-
-
-def test_property_write_delegation_qualifier_on_parameter():
-    """A parameter carrying a ``writeDelegation`` qualifier keeps it, with the
-    ``{delegation_base}``/``{aas_id_short}`` macros resolved to the resource's
-    DMP base and AAS id_short."""
-    from src.config_parser import parse_config_data
-    asset = parse_config_data(_config_with_write_delegated_location())
-    location = asset.parameters.parameter["Location"]
-    quals = {q.type_: q.value for q in location.qualifiers}
-    assert "writeDelegation" in quals
-    assert quals["writeDelegation"] == (
-        "http://dmp-syntegonstopperingsystemaas:8080/properties/syntegonStopperingSystemAAS/Location")
-
-
-def test_property_write_delegation_rest_interface_and_aimc():
-    """Opting a property into write-delegation auto-wires a REST write property
-    (PUT, writeProperty) and an AIMC mapping configuration."""
-    from src.config_parser import parse_config_data
-    asset = parse_config_data(_config_with_write_delegated_location())
-
-    # REST interface write property.
-    rest = asset.asset_interfaces_description.interface_rest
-    props = rest.InteractionMetadata.properties.property_name
-    assert "Location" in props
-    loc = props["Location"]
-    assert loc.forms.href.value == "/properties/syntegonStopperingSystemAAS/Location"
-    assert loc.forms.op.value == "writeProperty"
-    assert loc.forms.htv_methodName.value == "PUT"
-
-    # AIMC mapping: native MQTT action source → REST property sink.
-    aimc = asset.asset_interfaces_mapping_configuration
-    mc = next(
-        (m for m in aimc.MappingConfigurations.value if m.id_short == "Location"),
-        None,
-    )
-    assert mc is not None
-    src_keys = mc.Sources.value[0].Source.value.key
-    snk_keys = mc.Sinks.value[0].Sink.value.key
-    assert src_keys[-1].value == "Location" and "actions" in [k.value for k in src_keys]
-    assert snk_keys[-1].value == "Location" and "interface_rest" in [k.value for k in snk_keys]
-    lua = (mc.Transformation.value.decode()
-           if isinstance(mc.Transformation.value, bytes) else mc.Transformation.value)
-    assert "aimc_main" in lua

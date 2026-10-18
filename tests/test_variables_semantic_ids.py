@@ -1,59 +1,34 @@
-"""Variables submodel — semantic_id propagation tests (templates flow).
+"""Variables submodel — semantic_id propagation tests.
 
-Verifies that the Variables submodel built from a ResourceTypeAAS config
-carries the ontology semantic URI (``semantic_id_param``) on each variable.
+Verifies that the Variables submodel built from a Resource model
+carries the live-data value on each variable: the ``variable`` Property
+holds the LIVE data (empty until the first mapping tick), and the ontology
+concept URI rides as a supplemental semantic id of that Property (DMP issue
+5 — variables carry data as value, semantics as supplemental id, not the
+URI as value).
 
-The test needs a ResourceTypeAAS JSON config.  It defaults to the AP2030-UNS
-asset config (this repo is consumed as a submodule at ``Registration_Service/``
-in AP2030-UNS); set ``AAS_TEST_CONFIG`` to point at another config, or the
-tests are skipped.
+The test builds the current Python-authored Stoppering Resource model.
 """
 
 from __future__ import annotations
 
-import os
 import sys
+import os
 
 import pytest
 from basyx.aas import model
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "third_party", "aas_pydantic")))
 
-from aas_model import build_from_json  # noqa: E402
-
-CONFIG_PATH = os.environ.get(
-    "AAS_TEST_CONFIG",
-    os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "AASDescriptions",
-                     "Resource", "configs", "syntegonStoppering.json")
-    ),
-)
-
-if not os.path.exists(CONFIG_PATH):
-    pytest.skip(
-        f"AAS test config not found: {CONFIG_PATH} (set AAS_TEST_CONFIG to override)",
-        allow_module_level=True,
-    )
+from aas_model import build_from_model  # noqa: E402
+from aas_model.resource_instances.stopperingModule import syntegon_stoppering  # noqa: E402
 
 
-def _find_collection(container, id_short: str) -> model.SubmodelElementCollection:
-    elements = (
-        getattr(container, "submodel_element", None)
-        or getattr(container, "value", None)
-        or []
-    )
-    for element in elements:
-        if isinstance(element, model.SubmodelElementCollection) and element.id_short == id_short:
-            return element
-    raise AssertionError(f"Collection not found: {id_short}")
-
-
-def _find_property(collection: model.SubmodelElementCollection, id_short: str) -> model.Property:
-    for element in collection.value:
+def _find_property(container: model.Submodel, id_short: str) -> model.Property:
+    for element in container.submodel_element:
         if isinstance(element, model.Property) and element.id_short == id_short:
             return element
-    raise AssertionError(f"Property not found: {collection.id_short}.{id_short}")
+    raise AssertionError(f"Property not found: {container.id_short}.{id_short}")
 
 
 def _semantic_id_value(ref: model.ExternalReference | None) -> str | None:
@@ -62,6 +37,14 @@ def _semantic_id_value(ref: model.ExternalReference | None) -> str | None:
     if not ref.key:
         return None
     return ref.key[0].value
+
+
+def _supplemental_uris(prop: model.Property) -> list[str]:
+    uris = []
+    for ref in prop.supplemental_semantic_id or []:
+        if ref.key:
+            uris.append(ref.key[0].value)
+    return uris
 
 
 def _find_variables_submodel(store) -> model.Submodel:
@@ -74,16 +57,18 @@ def _find_variables_submodel(store) -> model.Submodel:
 
 
 def test_variables_semantic_id_propagates_to_built_submodel():
-    store = build_from_json(CONFIG_PATH)
+    store = build_from_model(syntegon_stoppering())
     variables_sm = _find_variables_submodel(store)
 
-    # Single variables are direct parts of the top-level VariableItem: the
-    # ``variable`` Property + ``interface_reference`` are direct children (no
-    # extra "variable" SMC wrapper).
-    packml = _find_collection(variables_sm, "PackMLState")
-    packml_semantic = _find_property(packml, "variable")
-    assert packml_semantic.value == "https://w3id.org/2026/apex/semantic/state/operational"
+    # Each variable is a direct Property carrying live data; its ontology
+    # concept URI rides as a supplemental semantic id, not as the value.
+    packml_semantic = _find_property(variables_sm, "PackMLState")
+    # the built AAS serializes the initial live-data state as null/absent
+    assert packml_semantic.value in (None, "")
+    assert "https://w3id.org/2026/apex/semantic/state/operational" \
+        in _supplemental_uris(packml_semantic)
 
-    occupation = _find_collection(variables_sm, "OccupationState")
-    occupation_semantic = _find_property(occupation, "variable")
-    assert occupation_semantic.value == "https://w3id.org/2026/apex/semantic/state/occupied"
+    occupation_semantic = _find_property(variables_sm, "OccupationState")
+    assert occupation_semantic.value in (None, "")
+    assert "https://w3id.org/2026/apex/semantic/state/occupied" \
+        in _supplemental_uris(occupation_semantic)

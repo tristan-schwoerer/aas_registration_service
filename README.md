@@ -1,15 +1,17 @@
 # Registration Service
 
-Registers Asset Administration Shells (AAS) from JSON configuration files.
+Registers Asset Administration Shells (AAS) from exported Python Resource models.
 
-The registration service has exactly **five responsibilities** — the published
+The registration service has **three responsibilities** — the published
 AAS is the single source of truth for all downstream services:
 
-1. Convert IDTA templates into Pydantic classes (`third_party/aas_pydantic/scripts/idta_generate.py`)
-2. Modify / extend / add Pydantic classes to define submodel and asset templates (`src/templates/`)
-3. Generate a JSON template for asset templates (`generate_station_template`)
-4. Deep-merge the filled-out asset template with the JSON config received via MQTT (`config_parser.parse_config_data`)
-5. Post the AAS to BaSyx
+1. Validate exported `Resource` JSON received via MQTT or from a file.
+2. Build the AAS directly from the validated model using `aas_model.build_from_model`.
+3. Post the AAS to BaSyx.
+
+Authoring and exporting a `Resource` is not this service's job: resources are
+defined with the `aas-model` package (`resource_template/`,
+`resource_instances/`) and exported with its `scripts/export_resource.py`.
 
 All former "processing" (topics.json for Operation Delegation, DataBridge
 config generation, schema/endpoint extraction) has been **removed** — operation
@@ -25,11 +27,11 @@ container at runtime.
 
 Submodules:
 
-- `third_party/aas_pydantic` — the (forked) pydantic↔BaSyx conversion layer +
-  the IDTA template generator (`scripts/idta_generate.py`)
-- `MQTTSchemas` — the `mqtt_message_schemas` repo (JSON schemas for MQTT
-  messages; mapped from the `.../github.io/.../MQTTSchemas/` URL namespace by
-  `src/schema_parser.py`, overridable via the `MQTT_SCHEMAS_DIR` env var)
+- `aas-model` — the shared AAS data-model package (ADR-016): the `Resource`
+  model the service validates exports against and `build_from_model`. Its own
+  submodules bring the IDTA `submodel-templates` and `MQTTSchemas`. The pinned
+  commit is the model version the service accepts; advance it together with the
+  stations that publish exports.
 
 ## Setup
 
@@ -37,13 +39,13 @@ Submodules:
 git clone git@github.com:tristan-schwoerer/aas_registration_service.git
 cd aas_registration_service
 git submodule update --init --recursive
-pip install -r requirements.txt
+pip install ./aas-model -r requirements.txt
 ```
 
 ## Features
 
-- **Config-based Registration**: Register assets from JSON configuration files matching the `ResourceTypeAAS` schema
-- **Deep-Merge + Strict Validation**: The config is deep-merged with the asset template and validated against the Pydantic model — unknown/clashing keys fail loudly
+- **Model-based Registration**: Register assets from complete JSON exports of Python-authored `Resource` instances
+- **Direct Validation**: Validate the authored structure without merging another resource into it or enriching its AID at registration time
 - **AAS Generation**: Generates full AAS descriptions via the Pydantic → aas_pydantic → BaSyx pipeline
 - **BaSyx Registration**: Registers Shells, Submodels, and Concept Descriptions with BaSyx (repositories + registries)
 - **MQTT Listener**: Listens for registration requests via MQTT for dynamic asset onboarding
@@ -51,16 +53,24 @@ pip install -r requirements.txt
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+pip install ./aas-model -r requirements.txt
 ```
 
 ## Usage
+
+### Exported Resource JSON
+
+The service registers the JSON export of a Python-authored `Resource`
+(`aas-model`'s `scripts/export_resource.py`). JSON is an interchange format, not
+a partial override language: the service validates it as a `Resource` without
+merging defaults or enriching the AID. IDs and self-references are resolved
+during the AAS build without modifying the imported model.
 
 ### Register from a JSON config
 
 ```bash
 # In Docker (aas-env / aas-registry / sm-registry resolve on the network)
-python registration-service.py register-config AASDescriptions/Resource/configs/syntegonStoppering.json
+python registration-service.py register-config stoppering.export.json
 
 # From the host (pass the registry URLs explicitly — global options come
 # before the subcommand)
@@ -69,9 +79,9 @@ python registration-service.py \
   --aas-registry-url http://localhost:8082 \
   --sm-registry-url http://localhost:8083 \
   register-config \
-  ../AASDescriptions/Resource/configs/syntegonStoppering.json
+  stoppering.export.json
 
-# Register all configs from a directory
+# Register all exported configs from a directory
 python registration-service.py register-dir AASDescriptions/Resource/configs/
 ```
 
@@ -86,21 +96,21 @@ python registration-service.py listen \
   --basyx-url http://localhost:8081
 ```
 
-Each received config message is deep-merged with the asset template, built into
-an AAS and posted to BaSyx.
+Each received model export is validated directly, built into an AAS and posted
+to BaSyx. Its explicitly authored containers are not repopulated from defaults.
 
 #### MQTT Message Formats
 
 **Config-based registration** (preferred, on topic `NN/Nybrovej/InnoLab/Registration/Config`):
-```json
-{
-  "requestId": "unique-id",
-  "assetId": "syntegonStopperingSystemAAS",
-  "config": {
-    "idShort": "syntegonStopperingSystemAAS",
-    "id": "https://smartproductionlab.aau.dk/aas/syntegonStopperingSystemAAS",
-    ...
-  }
+```python
+import json
+from aas_model.resource_instances.stopperingModule import syntegon_stoppering
+
+resource = syntegon_stoppering()
+request = {
+    "requestId": "unique-id",
+    "assetId": resource.id_short,
+    "config": json.loads(resource.model_dump_json()),
 }
 ```
 
@@ -126,15 +136,25 @@ python registration-service.py list
 
 The registration service consists of:
 
-1. **config_parser**: Deep-merges the JSON config with the asset template, validates against `ResourceTypeAAS`, injects IDs and enriches config-declared AID datapoints with their JSON Schema structures
+1. **config_parser**: Uses native Pydantic validation for exported `Resource` JSON without merging, ID injection, URL-specific checks, or AID enrichment
 2. **RegistrationService**: Orchestrates the registration workflow (parse → build AAS → post to BaSyx)
 3. **MQTTConfigRegistrationService**: MQTT listener for dynamic registration
 
 ### Workflow
 
 ```
-JSON Config → Deep-merge with asset template → Pydantic validation → AAS (aas_pydantic → BaSyx JSON) → Post to BaSyx
+Python Resource -> JSON export -> Pydantic validation -> build_from_model -> BaSyx JSON -> Post to BaSyx
 ```
+
+### Tests
+
+```bash
+python -m pytest -q
+```
+
+The default suite does not publish to a running BaSyx server. Enable the live
+registration test explicitly with `RUN_BASYX_INTEGRATION=1`; `BASYX_URL` selects
+the target. The tests import `aas_model` from the `aas-model` submodule.
 
 ## Configuration
 
@@ -214,4 +234,3 @@ Only action semantics are emitted in Skills:
 
 For compatibility, unsupported extended fields such as `processes`, `events`,
 `constraints`, and `preferences` are ignored when present in Skills config.
-

@@ -1,24 +1,21 @@
 # Registration service container.
 #
-# The shared AAS data-model package (ADR-016, `aas-model`) is not on a public
-# index yet, so the build installs it from the sibling submodule, passed as the
-# named build context `aas_model` (the compose files do this with
-# additional_contexts). Standalone:
+# The shared AAS data-model package (ADR-016) is the `aas-model` submodule; it
+# is not on a public index, so the build installs it from there. Initialize the
+# submodules first:
 #
-#     docker build --build-context aas_model=../aas-model -t registration-service .
+#     git submodule update --init --recursive
+#     docker build -t registration-service .
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# The vendored model installs first so nothing pulls the stale remote package.
-COPY --from=aas_model . ./_aas_model/
+# The model installs first so its layer is cached across service changes.
+COPY aas-model ./aas-model/
 COPY requirements.txt .
-RUN pip install --no-cache-dir ./_aas_model \
+RUN pip install --no-cache-dir ./aas-model \
     && pip install --no-cache-dir -r requirements.txt
 
-# Copy the service (requires submodules to be initialized first:
-#   git submodule update --init --recursive
-# so that MQTTSchemas is present)
 COPY . .
 
 # Note: the AAS configs are asset-side (AP2030-UNS) and are mounted at

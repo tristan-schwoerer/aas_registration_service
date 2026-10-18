@@ -3,10 +3,9 @@
 Registration Service - CLI Entry Point
 
 This service:
-1. Parses JSON configuration files matching the ResourceTypeAAS schema
-2. Deep-merges them with the asset template (Pydantic validation)
-3. Generates AAS descriptions via the Pydantic + BaSyx pipeline
-4. Registers AAS and submodels with BaSyx server
+1. Parses exported Python-authored Resource JSON
+2. Generates AAS descriptions via the Resource + BaSyx pipeline
+3. Registers AAS and submodels with BaSyx server
 
 The AAS is the single source of truth — no topics.json / DataBridge /
 Operation-Delegation processing happens here anymore.
@@ -217,7 +216,7 @@ Examples:
                 mqtt_service.start()
                 logger.info("✓ MQTT listener started. Press Ctrl+C to stop.")
                 logger.info("\nRegistration service running with:")
-                logger.info("  - MQTT registration listener (deep merge → AAS → post to BaSyx)")
+                logger.info("  - MQTT registration listener (validate → build AAS → post to BaSyx)")
                 logger.info("\nSupported config message formats:")
                 logger.info("1. Raw YAML (from ESP32 devices):")
                 logger.info("   syntegonStopperingSystemAAS:")

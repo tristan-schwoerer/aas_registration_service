@@ -1,17 +1,8 @@
-"""
-Asset Config — load JSON, validate against ResourceTypeAAS.
+"""Load and directly validate exported Resource model JSON.
 
-The Pydantic model IS the config.  JSON must match the ResourceTypeAAS schema.
-id_short and id are auto-injected post-validation via the id_injector module.
-
-This module is deliberately minimal: its only job is to turn the received JSON
-config into a validated, fully-populated ``ResourceTypeAAS`` instance — deep
-merging the filled-out asset template under the instance config, injecting
-IDs, and enriching config-declared AID datapoints with their JSON Schema
-structures.  All further parsing/processing (topics.json, operation-delegation
-entries, DataBridge mappings, …) has been REMOVED from the registration
-service: downstream services read the published AAS as the single source of
-truth.
+The JSON is an interchange representation of a Python-authored Resource, not
+a partial configuration to merge with defaults. Build-time ID resolution is
+owned by ``aas_model.build_from_model``.
 
 Usage::
 
@@ -22,52 +13,18 @@ Usage::
 
 from __future__ import annotations
 
-import json
-import logging
+import copy
 from typing import Any, Dict
 
-from aas_model.resource_template.asset import ResourceTypeAAS
-from aas_model.resource_template.asset_interfaces_description import (
-    ensure_aid_datapoint_schemas,
-)
-from aas_model.builder import merge_instance_config
-from aas_model.id_injector import inject_ids
-from aas_model.constants import DELEGATION_BASE
-from aas_model.resource_template.property_delegation import (
-    ensure_property_write_delegation,
-)
-
-logger = logging.getLogger(__name__)
+from aas_model.resource_template.asset import Resource
 
 
-def parse_config_file(path: str) -> ResourceTypeAAS:
-    """Load JSON config file, validate, inject IDs, return ResourceTypeAAS."""
-    with open(path) as f:
-        return parse_config_data(json.load(f))
+def parse_config_file(path: str) -> Resource:
+    """Load an exported Resource JSON file and validate it without mutation."""
+    with open(path, encoding="utf-8") as file:
+        return Resource.model_validate_json(file.read())
 
 
-def parse_config_data(data: Dict[str, Any]) -> ResourceTypeAAS:
-    """Validate against ResourceTypeAAS (base defaults merged under the
-    instance config — so specialized types survive and omitted fields fall
-    back to defaults), inject IDs, return model instance.
-
-    The optional top-level ``delegation_base`` config key overrides the
-    resource's DMP / operation-delegation base URL (defaults to
-    ``constants.DELEGATION_BASE``); it is resolved into the skill Operation
-    ``invocationDelegation`` qualifiers and the AID REST interface base.
-
-    Config-declared AID datapoints (action ``input``/``output`` DataSchemas,
-    property payload schemas) that carry a JSON Schema URL as their
-    supplemental semantic id are populated from that schema."""
-    delegation_base = data.get("delegation_base") or DELEGATION_BASE
-    asset = ResourceTypeAAS.model_validate(merge_instance_config(data))
-    # Property write-delegation: any property carrying a ``writeDelegation``
-    # qualifier gets its REST write interface + AIMC mapping auto-wired
-    # (before id injection so the ``{delegation_base}``/``{aas_id_short}``
-    # macros resolve).
-    ensure_property_write_delegation(asset)
-    inject_ids(asset, delegation_base=delegation_base)
-    if asset.asset_interfaces_description is not None:
-        ensure_aid_datapoint_schemas(asset.asset_interfaces_description)
-    return asset
-
+def parse_config_data(data: Dict[str, Any]) -> Resource:
+    """Validate an exported Resource model without merging or enriching it."""
+    return Resource.model_validate(copy.deepcopy(data))

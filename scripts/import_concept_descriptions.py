@@ -28,7 +28,7 @@ import requests
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, ".."))
-sys.path.insert(0, os.path.abspath(os.path.join(_HERE, "..", "..", "aas-model", "src")))
+sys.path.insert(0, os.path.join(_HERE, "..", "aas-model", "src"))
 
 # The IDTA templates the generator builds from — their conceptDescriptions
 # cover the semanticIds the generated AASs reference.
@@ -39,11 +39,11 @@ TEMPLATES = [
     "submodel-templates/published/Hierarchical Structures enabling Bills of Material/1/1/1/IDTA 02011-1-1-1_Template_HSEBoM_forAASMetamodelV3.1.json",
     "submodel-templates/published/Digital nameplate/3/0/1/IDTA 02006-3-0-1_Template_Digital Nameplate.json",
     "submodel-templates/published/Asset Interfaces Mapping Configuration/2/0/IDTA 02027_Template_AIMC.json",
-    "submodel-templates/published/Asset Interfaces Description/1/1/IDTA 02017-1-1_Template_Asset Interfaces Description.json",
+    "submodel-templates/published/Asset Interfaces Description/1/2/IDTA 02017_Template_Asset Interfaces Description.json",
 ]
 
 _TEMPLATES_ROOT = os.path.join(
-    _HERE, "..", "third_party", "aas_pydantic", "submodel-templates", "published"
+    _HERE, "..", "aas-model", "submodel-templates", "published"
 )
 
 

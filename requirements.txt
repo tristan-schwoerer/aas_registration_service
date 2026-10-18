@@ -18,11 +18,6 @@ PyYAML>=6.0.0
 # Loading .env for register_all_assets.py
 python-dotenv>=1.0.0
 
-# Shared AAS data-model package (ADR-016) — single source of truth for the whole
-# data model (vendored aas_pydantic + generated IDTA templates + resource
-# templates + build/schema helpers + MQTTSchemas), the sibling aas-model
-# submodule. The Dockerfile installs it from the named build context
-# `aas_model` (`pip install ./_aas_model`) BEFORE
-# `pip install -r requirements.txt`, so no entry
-# belongs here — a `git+https://...` line here would reinstall the stale
-# remote package over the current one.
+# Shared AAS data-model package (ADR-016): the `aas-model` submodule. Install it
+# first with `pip install ./aas-model` (the Dockerfile does); no entry belongs
+# here, since a `git+https://...` line would replace the pinned submodule.

@@ -2,11 +2,10 @@
 """
 Registration Service Integration Test
 
-Tests the registration flow against the current ResourceTypeAAS (JSON)
-pipeline:
+Tests the registration flow against the current Python-authored Resource model:
 
-1. Config parsing (parse_config_file — deep merge + validation)
-2. AAS generation (build_from_json → BaSyx store)
+1. Config parsing (direct Resource validation)
+2. AAS generation (build_from_model → BaSyx store)
 3. Full registration (optional - requires BaSyx)
 
 Runs under pytest (``python -m pytest tests/registration_flow_test.py``) or
@@ -16,6 +15,7 @@ standalone (``python tests/registration_flow_test.py``).
 from __future__ import annotations
 
 import os
+import json
 import sys
 from pathlib import Path
 
@@ -24,28 +24,14 @@ import pytest
 # Add repo + src to path (so the script works standalone too)
 _HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(_HERE.parent))
-sys.path.insert(0, str(_HERE.parent / "third_party" / "aas_pydantic"))
 
 from src import (  # noqa: E402
     BaSyxConfig,
     RegistrationService,
 )
-from src.config_parser import parse_config_file  # noqa: E402
-from aas_model import build_from_json  # noqa: E402
-
-# The current Resource config (JSON, ResourceTypeAAS schema).  Defaults to the
-# AP2030-UNS asset config (this repo is consumed as a submodule at
-# Registration_Service/ in AP2030-UNS); override with AAS_TEST_CONFIG.
-CONFIG_PATH = os.environ.get(
-    "AAS_TEST_CONFIG",
-    str(
-        _HERE.parent.parent
-        / "AASDescriptions"
-        / "Resource"
-        / "configs"
-        / "syntegonStoppering.json"
-    ),
-)
+from src.config_parser import parse_config_data  # noqa: E402
+from aas_model import build_from_model  # noqa: E402
+from aas_model.resource_instances.stopperingModule import syntegon_stoppering  # noqa: E402
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -53,16 +39,13 @@ CONFIG_PATH = os.environ.get(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @pytest.fixture(scope="module")
-def config_path() -> Path:
-    path = Path(CONFIG_PATH)
-    if not path.exists():
-        pytest.skip(f"config not found: {path}")
-    return path
+def resource_data():
+    return json.loads(syntegon_stoppering().model_dump_json())
 
 
 @pytest.fixture(scope="module")
-def asset(config_path: Path):
-    return parse_config_file(str(config_path))
+def asset(resource_data):
+    return parse_config_data(resource_data)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -78,12 +61,75 @@ def test_config_parsing(asset):
     assert asset.asset_interfaces_description is not None
 
 
+def test_config_parsing_preserves_the_complete_export(resource_data):
+    asset = parse_config_data(resource_data)
+
+    assert json.loads(asset.model_dump_json()) == resource_data
+
+
+def test_config_parsing_does_not_restore_removed_resource_elements():
+    resource = syntegon_stoppering()
+    resource.variables.variable.clear()
+    resource.parameters.parameter.clear()
+    resource.control_component_instance.Skills.Skill.pop("Halt")
+    data = json.loads(resource.model_dump_json())
+    asset = parse_config_data(data)
+
+    assert asset.variables.variable == {}
+    assert asset.parameters.parameter == {}
+    assert "Halt" not in asset.control_component_instance.Skills.Skill
+    assert json.loads(asset.model_dump_json()) == data
+
+
+def test_config_parsing_does_not_enrich_schema_or_mqtt_terms(monkeypatch):
+    from aas_model.submodel_templates.aid import DmpActionInput
+
+    resource = syntegon_stoppering()
+    action = resource.asset_interfaces_description.InterfaceTemplateForMQTT[
+        "interface_mqtt"
+    ].InteractionMetadata.actions.property_name["Stoppering"]
+    action.input = DmpActionInput(
+        id_short="input", supplemental_semantic_ids=["https://example.invalid/schema.json"],
+    )
+    action.forms.mqv_responseTopic = None
+    data = json.loads(resource.model_dump_json())
+
+    def unexpected_schema_load(*args, **kwargs):
+        raise AssertionError("Registration must not fetch authoring schemas")
+
+    monkeypatch.setattr("aas_model.json_schema_aid.load_schema", unexpected_schema_load)
+    asset = parse_config_data(data)
+
+    assert json.loads(asset.model_dump_json()) == data
+
+
+def test_aas_generation_receives_the_validated_model(monkeypatch):
+    import src.registration_service as registration_service
+
+    asset = syntegon_stoppering()
+    store = object()
+    seen = []
+    monkeypatch.setattr(registration_service, "build_from_model", lambda value: seen.append(value) or store)
+    monkeypatch.setattr(
+        "aas_pydantic.convert_util.strip_temp_id_short_attributes", lambda value: None,
+    )
+    monkeypatch.setattr(
+        "basyx.aas.adapter.json.json_serialization.object_store_to_json",
+        lambda value: "{}",
+    )
+
+    result = RegistrationService()._generate_aas(asset)
+
+    assert result == {}
+    assert seen == [asset]
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 2. AAS generation
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def test_aas_generation(config_path: Path):
-    store = build_from_json(str(config_path))
+def test_aas_generation(asset):
+    store = build_from_model(asset)
 
     shells = [o for o in store if o.__class__.__name__ == "AssetAdministrationShell"]
     submodels = [o for o in store if o.__class__.__name__ == "Submodel"]
@@ -98,26 +144,22 @@ def test_aas_generation(config_path: Path):
         "Nameplate",
         "AssetInterfacesDescription",
         "ControlComponentInstance",
+        "CapabilityDescription",
         "Variables",
         "Parameters",
     }
 
-    # AID must carry the MQTT actions + the WoT op field on forms
+    # AID must carry the MQTT actions, each with a form (WoT: an action's op
+    # defaults to invokeaction, so the form need not state it)
     aid = next(sm for sm in submodels if sm.id_short == "AssetInterfacesDescription")
-    op_count = 0
-
-    def _walk(el):
-        nonlocal op_count
-        if getattr(el, "id_short", "") == "op":
-            op_count += 1
-        value = getattr(el, "value", None)
-        items = list(value) if hasattr(value, "__iter__") and not isinstance(value, (str, bytes)) else []
-        for child in items:
-            _walk(child)
-
-    for el in aid.submodel_element:
-        _walk(el)
-    assert op_count >= 4, "each action form must carry an op Property"
+    mqtt = next(el for el in aid.submodel_element if el.id_short == "interface_mqtt")
+    metadata = next(el for el in mqtt.value if el.id_short == "InteractionMetadata")
+    actions = next(el for el in metadata.value if el.id_short == "actions")
+    assert {a.id_short for a in actions.value} >= {"Halt", "Occupy", "Release", "Stoppering"}
+    for action in actions.value:
+        forms = next(el for el in action.value if el.id_short == "forms")
+        href = next(el for el in forms.value if el.id_short == "href")
+        assert href.value == f"CMD/{action.id_short}"
 
     # Parameters.Location must carry its children (x/y/yaw)
     parameters = next(sm for sm in submodels if sm.id_short == "Parameters")
@@ -144,8 +186,12 @@ def _default_basyx_url() -> str:
     return os.environ.get("BASYX_URL", "http://localhost:8081")
 
 
-def test_full_registration(config_path: Path, basyx_url: str = ""):
-    """Register the config against a live BaSyx server (requires the stack)."""
+@pytest.mark.skipif(
+    os.environ.get("RUN_BASYX_INTEGRATION") != "1",
+    reason="Set RUN_BASYX_INTEGRATION=1 to publish to a live BaSyx server",
+)
+def test_full_registration(resource_data, basyx_url: str = ""):
+    """Register against a live BaSyx server only when explicitly enabled."""
     basyx_url = basyx_url or _default_basyx_url()
     try:
         import requests
@@ -161,7 +207,7 @@ def test_full_registration(config_path: Path, basyx_url: str = ""):
     service = RegistrationService(
         config=BaSyxConfig(base_url=basyx_url),
     )
-    assert service.register_from_config(str(config_path))
+    assert service.register_from_data(resource_data)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -172,23 +218,24 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Test Registration Service Flow")
-    parser.add_argument("--config", default=str(CONFIG_PATH))
+    parser.add_argument("--config", help="Optional exported Resource JSON file")
     parser.add_argument("--with-basyx", action="store_true")
     parser.add_argument("--basyx-url", default=_default_basyx_url())
     args = parser.parse_args()
 
-    config_path = Path(args.config)
-    if not config_path.exists():
-        print(f"Config file not found: {config_path}")
-        sys.exit(1)
-
     results = {}
     try:
-        asset = parse_config_file(str(config_path))
+        if args.config:
+            from src.config_parser import parse_config_file
+            asset = parse_config_file(args.config)
+            resource_data = asset.model_dump(mode="json")
+        else:
+            resource_data = json.loads(syntegon_stoppering().model_dump_json())
+            asset = parse_config_data(resource_data)
         results["config_parsing"] = "PASSED"
         print("config parsing: PASSED")
 
-        store = build_from_json(str(config_path))
+        store = build_from_model(asset)
         shells = [o for o in store if o.__class__.__name__ == "AssetAdministrationShell"]
         submodels = [o for o in store if o.__class__.__name__ == "Submodel"]
         results["aas_generation"] = "PASSED" if shells and len(submodels) >= 5 else "FAILED"
@@ -198,7 +245,7 @@ def main():
             service = RegistrationService(
                 config=BaSyxConfig(base_url=args.basyx_url),
             )
-            results["full_registration"] = "PASSED" if service.register_from_config(str(config_path)) else "FAILED"
+            results["full_registration"] = "PASSED" if service.register_from_data(resource_data) else "FAILED"
             print(f"full registration: {results['full_registration']}")
     finally:
         pass
