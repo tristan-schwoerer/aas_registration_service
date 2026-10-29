@@ -24,3 +24,8 @@ htmlcov/
 # Temp files
 *.tmp
 *.log
+
+# Build artifacts of the aas-model submodule: pip would install a stale build/ over the sources
+**/build/
+**/*.egg-info/
+**/.venv/
