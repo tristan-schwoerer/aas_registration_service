@@ -260,18 +260,15 @@ def _mapping_name(mc) -> str:
 
 
 def test_aimc_covers_variables_and_every_skill(store):
-    # Variables mapping lives in MappingConfigurations.
+    # The station state is written into its series in Variables.
     mapping_list = _aimc_mapping_list(store)
     mappings = list(_children(mapping_list))
     assert mappings
 
-    sink_ids = set()
-    for mc in mappings:
-        sinks = _child(mc, "Sinks")
-        for snk in _children(sinks):
-            sink_id = _child(snk, "SinkId")
-            sink_ids.add(sink_id.value)
-    assert {"PackMLState", "OccupationState"} <= sink_ids
+    [state] = [mc for mc in mappings if _mapping_name(mc) == "StationState"]
+    [sink] = _children(_child(state, "Sinks"))
+    assert _child(sink, "SinkId").value == "Live"
+    assert [key.value for key in _child(sink, "Sink").value.key[1:]] == ["State", "Station", "Segments", "Live"]
 
     # Every CCI skill is covered by ONE operation-delegation MappingConfiguration
     # (DMP v3 one-MC authoring: source = the skill's Operation element).

@@ -1,11 +1,9 @@
 """Variables submodel — semantic_id propagation tests.
 
-Verifies that the Variables submodel built from a Resource model
-carries the live-data value on each variable: the ``variable`` Property
-holds the LIVE data (empty until the first mapping tick), and the ontology
-concept URI rides as a supplemental semantic id of that Property (DMP issue
-5 — variables carry data as value, semantics as supplemental id, not the
-URI as value).
+Verifies that the Variables submodel built from a Resource model grounds
+the fields of its station state series: each record field carries its
+ontology concept URI as a supplemental semantic id (DMP issue 5 — data is
+the value, semantics the supplemental id, not the URI as value).
 
 The test builds the current Python-authored Stoppering Resource model.
 """
@@ -24,8 +22,8 @@ from aas_model import build_from_model  # noqa: E402
 from aas_model.resource_instances.stopperingModule import syntegon_stoppering  # noqa: E402
 
 
-def _find_property(container: model.Submodel, id_short: str) -> model.Property:
-    for element in container.submodel_element:
+def _find_property(container: model.SubmodelElementCollection, id_short: str) -> model.Property:
+    for element in container.value:
         if isinstance(element, model.Property) and element.id_short == id_short:
             return element
     raise AssertionError(f"Property not found: {container.id_short}.{id_short}")
@@ -60,15 +58,15 @@ def test_variables_semantic_id_propagates_to_built_submodel():
     store = build_from_model(syntegon_stoppering())
     variables_sm = _find_variables_submodel(store)
 
-    # Each variable is a direct Property carrying live data; its ontology
-    # concept URI rides as a supplemental semantic id, not as the value.
-    packml_semantic = _find_property(variables_sm, "PackMLState")
-    # the built AAS serializes the initial live-data state as null/absent
+    # The state is a series: its record fields carry the concepts; the rows live in InfluxDB.
+    record = variables_sm.get_referable("State").get_referable("Station") \
+        .get_referable("Metadata").get_referable("Record")
+    packml_semantic = _find_property(record, "PackMLState")
     assert packml_semantic.value in (None, "")
     assert "https://w3id.org/2026/apex/semantic/state/operational" \
         in _supplemental_uris(packml_semantic)
 
-    occupation_semantic = _find_property(variables_sm, "OccupationState")
+    occupation_semantic = _find_property(record, "OccupationState")
     assert occupation_semantic.value in (None, "")
     assert "https://w3id.org/2026/apex/semantic/state/occupied" \
         in _supplemental_uris(occupation_semantic)

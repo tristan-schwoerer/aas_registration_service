@@ -69,13 +69,13 @@ def test_config_parsing_preserves_the_complete_export(resource_data):
 
 def test_config_parsing_does_not_restore_removed_resource_elements():
     resource = syntegon_stoppering()
-    resource.variables.variable.clear()
+    resource.variables.State.value.clear()
     resource.parameters.parameter.clear()
     resource.control_component_instance.Skills.Skill.pop("Halt")
     data = json.loads(resource.model_dump_json())
     asset = parse_config_data(data)
 
-    assert asset.variables.variable == {}
+    assert asset.variables.State.value == {}
     assert asset.parameters.parameter == {}
     assert "Halt" not in asset.control_component_instance.Skills.Skill
     assert json.loads(asset.model_dump_json()) == data
