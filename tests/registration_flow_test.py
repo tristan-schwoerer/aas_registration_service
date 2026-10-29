@@ -31,7 +31,7 @@ from src import (  # noqa: E402
 )
 from src.config_parser import parse_config_data  # noqa: E402
 from aas_model import build_from_model  # noqa: E402
-from aas_model.resource_instances.stopperingModule import syntegon_stoppering  # noqa: E402
+from aas_model.resource_instances import syntegon_stoppering  # noqa: E402
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -110,9 +110,6 @@ def test_aas_generation_receives_the_validated_model(monkeypatch):
     store = object()
     seen = []
     monkeypatch.setattr(registration_service, "build_from_model", lambda value: seen.append(value) or store)
-    monkeypatch.setattr(
-        "aas_pydantic.convert_util.strip_temp_id_short_attributes", lambda value: None,
-    )
     monkeypatch.setattr(
         "basyx.aas.adapter.json.json_serialization.object_store_to_json",
         lambda value: "{}",

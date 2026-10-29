@@ -172,15 +172,8 @@ class RegistrationService:
         """
         try:
             from basyx.aas.adapter.json import json_serialization
-            from aas_pydantic.convert_util import strip_temp_id_short_attributes
 
             obj_store = build_from_model(asset)
-
-            # AASd-120 SML items park their id_short in a synthetic temp
-            # Property during conversion — strip it so it never appears in the
-            # published/serialized AAS.
-            strip_temp_id_short_attributes(obj_store)
-
             json_str = json_serialization.object_store_to_json(obj_store)
             return json.loads(json_str)
 

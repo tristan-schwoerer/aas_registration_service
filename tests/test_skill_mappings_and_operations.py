@@ -32,7 +32,7 @@ from basyx.aas import model
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from aas_model import build_from_model  # noqa: E402
-from aas_model.resource_instances.stopperingModule import syntegon_stoppering  # noqa: E402
+from aas_model.resource_instances import syntegon_stoppering  # noqa: E402
 
 def _children(el) -> list:
     """Children of a basyx Submodel / SMC (``submodel_element`` or ``value``)."""
@@ -254,9 +254,8 @@ def _aimc_mapping_list(store):
 
 def _mapping_name(mc) -> str:
     """The name of an AIMC MappingConfiguration SML item: list items carry no
-    idShort (AASd-120), their name is the key of their class marker."""
-    from aas_pydantic.convert_util import own_id_short
-    return own_id_short(mc)
+    idShort (AASd-120), their name is their display name."""
+    return mc.display_name.get("en")
 
 
 def test_aimc_covers_variables_and_every_skill(store):

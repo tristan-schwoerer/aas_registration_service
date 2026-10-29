@@ -19,7 +19,7 @@ from basyx.aas import model
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from aas_model import build_from_model  # noqa: E402
-from aas_model.resource_instances.stopperingModule import syntegon_stoppering  # noqa: E402
+from aas_model.resource_instances import syntegon_stoppering  # noqa: E402
 
 
 def _find_property(container: model.SubmodelElementCollection, id_short: str) -> model.Property:
