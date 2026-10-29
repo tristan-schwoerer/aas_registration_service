@@ -253,15 +253,10 @@ def _aimc_mapping_list(store):
 
 
 def _mapping_name(mc) -> str:
-    """The real id_short of an AIMC MappingConfiguration SML item.
-
-    SML items carry their id_short in a temp Property (AASd-120 workaround);
-    the actual SMC id_short is a ``generated_submodel_list_hack_`` placeholder.
-    """
-    for c in _children(mc):
-        if isinstance(c, model.Property) and c.id_short.startswith("temp_id_short_attribute"):
-            return str(c.value)
-    return mc.id_short
+    """The name of an AIMC MappingConfiguration SML item: list items carry no
+    idShort (AASd-120), their name is the key of their class marker."""
+    from aas_pydantic.convert_util import own_id_short
+    return own_id_short(mc)
 
 
 def test_aimc_covers_variables_and_every_skill(store):

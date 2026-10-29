@@ -16,7 +16,7 @@ from __future__ import annotations
 import copy
 from typing import Any, Dict
 
-from aas_model.resource_template.asset import Resource
+from aas_model import Resource
 
 
 def parse_config_file(path: str) -> Resource:
